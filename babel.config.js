@@ -19,7 +19,8 @@ module.exports = {
         '@controllers': './src/controllers',
         '@views': './src/views',
         '@api': ['./src/api'],
-        '@utils': ['./src/utils']
+        '@utils': ['./src/utils'],
+        '@types': ['./src/types']
       }
     }]
   ],

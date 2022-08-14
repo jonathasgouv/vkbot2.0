@@ -25,7 +25,8 @@
       "@views/*": ["./src/views/*"],
       "@config/*": ["./src/config/*"],
       "@api/*": ["./src/api/*"],
-      "@utils/*": ["./src/utils/*"]
+      "@utils/*": ["./src/utils/*"],
+      "@types/*": ["./src/types/*"]
     }
   },
   "include": [

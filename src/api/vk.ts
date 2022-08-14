@@ -7,6 +7,17 @@ interface ICreateBoardComment {
     attachments?: string[];
 }
 
+interface IGetTopicsComments {
+  groupId: number;
+  topicIds: number[];
+  order?: 1 | 2 | -1 | -2;
+  offset?: number;
+  count?: number;
+  extended?: 1 | 0;
+  preview?: 1 | 2 | 0;
+  previewLength?: number;
+}
+
 interface IGetBoardComments {
   groupId: number;
   topicId: number;
@@ -50,6 +61,25 @@ export default {
       }
 
       const response = await vkApi.get('/board.createComment', { params: queryParams })
+
+      return response.data.response
+    },
+
+    async getTopics (data: IGetTopicsComments) {
+      const topicIds = data.topicIds.join(',')
+
+      const queryParams = {
+        group_id: data.groupId,
+        topic_ids: topicIds,
+        order: data.order,
+        offset: data.offset,
+        count: data.count,
+        extended: data.extended,
+        preview: data.preview,
+        preview_length: data.previewLength
+      }
+
+      const response = await vkApi.get('/board.getTopics', { params: queryParams })
 
       return response.data.response
     },
@@ -101,8 +131,6 @@ export default {
 
       const response = await vkApi.get('/messages.send', { params: queryParams })
 
-      console.log(response.data)
-
       return response.data.response
     }
   },
@@ -116,8 +144,6 @@ export default {
       }
 
       const response = await vkApi.get('/likes.add', { params: queryParams })
-
-      console.log(response.data)
 
       return response.data.response
     }

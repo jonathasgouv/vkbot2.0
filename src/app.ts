@@ -1,7 +1,7 @@
+import '@config/environment'
 import express from 'express'
 import hookRouter from '@routes/hook'
 import cors from 'cors'
-import '@config/environment'
 
 const app = express()
 

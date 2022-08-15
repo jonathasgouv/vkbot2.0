@@ -4,7 +4,7 @@ import bot from '@utils/bot'
 export default {
   async post (req: Request, res: Response) {
     // Check if is confirmation
-    if (req.body.type === 'confirmation') return res.status(204).send(process.env.CONFIRMATION_KEY)
+    if (req.body.type === 'confirmation') return res.status(200).send(process.env.CONFIRMATION_KEY)
 
     // Check key
     if (req.body.secret !== process.env.SECRET) return res.status(401).send('Unauthorized.')

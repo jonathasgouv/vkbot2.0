@@ -105,7 +105,12 @@ export default {
   },
 
   async quotePost (data: ICommandsInput): Promise<void> {
-    const { topicId, cmmId, postId, userId } = data
+    const { topicId, cmmId, postId, userId, message } = data
+    const params = this.getCommandParameters(message)
+    const isMessage = params?.includes('m')
+
+    if (isMessage) return this.sendMessage(data)
+
     const text = await this.getQuoteString(postId, userId)
 
     await vkApi.board.createComment({ topicId, cmmId, text })

@@ -10,7 +10,7 @@ export default {
     if (req.body.secret !== process.env.SECRET) return res.status(200).send(process.env.CONFIRMATION_KEY)
 
     // Check event type
-    if (req.body.type !== 'board_post_new') return res.status(204).status(200).send(process.env.CONFIRMATION_KEY)
+    if (req.body.type !== 'board_post_new') return res.status(200).send(process.env.CONFIRMATION_KEY)
 
     const { group_id: cmmId } = req.body
     const { topic_id: topicId, from_id: userId, id: postId, text: message } = req.body.object

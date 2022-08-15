@@ -18,10 +18,10 @@ module.exports = {
         '@routes': './src/routes',
         '@controllers': './src/controllers',
         '@views': './src/views',
-        '@api': ['./src/api'],
-        '@utils': ['./src/utils'],
-        '@crons': ['./src/crons'],
-        '@types': ['./src/types']
+        '@api': './src/api',
+        '@utils': './src/utils',
+        '@crons': './src/crons',
+        '@types': './src/types'
       }
     }]
   ],

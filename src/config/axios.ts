@@ -7,8 +7,6 @@ const vkInstance = axios.create({
 })
 
 vkInstance.interceptors.request.use(config => {
-  console.log(config)
-
   config.params = {
     ...config.params,
     access_token: config.url === '/messages.send' ? process.env.ACCESS_TOKEN_MESSAGE : process.env.ACCESS_TOKEN,

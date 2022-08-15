@@ -11,7 +11,7 @@ interface ICommandsInput {
 }
 
 export default {
-  async getQuoteString (postId: string, userId: number): Promise<string> {
+  async getQuoteString (postId: number, userId: number): Promise<string> {
     const userData = await vkApi.users.get({ userIds: [userId] })
     const firstName = userData[0].first_name
 
@@ -170,8 +170,8 @@ export default {
       userId: userId,
       postId: postId,
       isMessage: !!isMessage,
-      requestDate: reminderDate,
-      expires: new Date()
+      requestDate: new Date(),
+      expires: reminderDate
     }
 
     Reminder.create(reminderObj)

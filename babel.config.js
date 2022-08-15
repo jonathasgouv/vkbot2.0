@@ -20,6 +20,7 @@ module.exports = {
         '@views': './src/views',
         '@api': ['./src/api'],
         '@utils': ['./src/utils'],
+        '@crons': ['./src/crons'],
         '@types': ['./src/types']
       }
     }]

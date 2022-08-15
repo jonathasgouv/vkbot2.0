@@ -1,4 +1,6 @@
 import '@config/environment'
+import './schedule'
+
 import express from 'express'
 import hookRouter from '@routes/hook'
 import cors from 'cors'

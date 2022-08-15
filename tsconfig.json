@@ -26,6 +26,7 @@
       "@config/*": ["./src/config/*"],
       "@api/*": ["./src/api/*"],
       "@utils/*": ["./src/utils/*"],
+      "@crons/*": ["./src/crons/*"],
       "@types/*": ["./src/types/*"]
     }
   },

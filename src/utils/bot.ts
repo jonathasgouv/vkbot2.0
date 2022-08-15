@@ -117,7 +117,7 @@ export default {
     const isMessage = params?.includes('m')
 
     const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
-    const tag = message.split('!tag')[1].replace('-m', '')
+    const tag = (message.split('!tag')[1] || message.split('!t')[1])?.replace('-m', '').trim()
 
     const text = `${quote} ${tag}`
 

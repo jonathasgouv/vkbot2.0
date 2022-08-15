@@ -7,10 +7,10 @@ export default {
     if (req.body.type === 'confirmation') return res.status(200).send(process.env.CONFIRMATION_KEY)
 
     // Check key
-    if (req.body.secret !== process.env.SECRET) return res.status(401).send('Unauthorized.')
+    if (req.body.secret !== process.env.SECRET) return res.status(200).send(process.env.CONFIRMATION_KEY)
 
     // Check event type
-    if (req.body.type !== 'board_post_new') return res.status(204).send('Invalid event.')
+    if (req.body.type !== 'board_post_new') return res.status(204).status(200).send(process.env.CONFIRMATION_KEY)
 
     const { group_id: cmmId } = req.body
     const { topic_id: topicId, from_id: userId, id: postId, text: message } = req.body.object
@@ -20,11 +20,11 @@ export default {
 
     // Check if there is a command
     const command = bot.getCommand(message)
-    if (!command) return res.status(204).send('No command found.')
+    if (!command) return res.status(200).send(process.env.CONFIRMATION_KEY)
 
     // If there is a command execute it
     await bot.execCommand(command, userId, topicId, postId, cmmId, message)
 
-    return res.status(200).json()
+    return res.status(200).send(process.env.CONFIRMATION_KEY)
   }
 }

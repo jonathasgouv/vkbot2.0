@@ -1,14 +1,7 @@
 import vkApi from '@api/vk'
 import cbfApi from '@api/cbf'
 import Reminder from '@models/Reminder'
-
-interface ICommandsInput {
-  userId: number;
-  topicId: number;
-  postId: number;
-  cmmId: number;
-  message: string;
-}
+import ICommandsInput from '@types/bot'
 
 export default {
   async getQuoteString (postId: number, userId: number): Promise<string> {

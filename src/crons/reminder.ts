@@ -3,7 +3,7 @@ import vkApi from '@api/vk'
 import bot from '@utils/bot'
 
 export default {
-  async sendResponses () {
+  async sendResponses (): Promise<void> {
     // Get reminders that are past current day
     const reminders = await Reminder.find({ expires: { $lte: new Date() } })
 

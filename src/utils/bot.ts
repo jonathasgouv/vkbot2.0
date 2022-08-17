@@ -34,6 +34,14 @@ export default {
     return comments.items[0].id === postId
   },
 
+  getTopicDataFromMessage (message: string): { cmm: number; tid: number; } | null {
+    const [, cmm, tid] = message.match(/topic-([0-9]*)_([0-9]*)/m)
+
+    if (!cmm || !tid) return null
+
+    return { cmm: parseInt(cmm), tid: parseInt(tid) }
+  },
+
   getCommand (text: string): string | undefined {
     return text.match(/!([a-z]*)/m)?.[1]
   },
@@ -75,7 +83,8 @@ export default {
       like: this.likePost,
       mensagem: this.sendMessage,
       jogos: this.sendGames,
-      remind: this.remindMe
+      remind: this.remindMe,
+      save: this.saveToTopic
     }
 
     // Shorthand versions of commands
@@ -85,7 +94,8 @@ export default {
       l: 'like',
       m: 'mensagem',
       j: 'jogos',
-      r: 'remind'
+      r: 'remind',
+      s: 'save'
     }
 
     // If it is a shorthand transpiles it to complete version
@@ -173,5 +183,18 @@ export default {
     }
 
     Reminder.create(reminderObj)
+  },
+
+  async saveToTopic (data: ICommandsInput): Promise<void> {
+    const { topicId, cmmId, message } = data
+    const topicTitle = await this.getTopicTitle(cmmId, topicId)
+    const { cmm: cmmFromMessage, tid: tidFromMessage } = this.getTopicDataFromMessage(message)
+
+    if (!cmmFromMessage || !tidFromMessage) return
+
+    const text = `${topicTitle}
+    https://vk.com/topic-${cmmId}_${topicId}`
+
+    await vkApi.board.createComment({ topicId: tidFromMessage, cmmId: cmmFromMessage, text })
   }
 }

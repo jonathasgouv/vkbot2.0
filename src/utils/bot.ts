@@ -1,7 +1,10 @@
 import vkApi from '@api/vk'
 import cbfApi from '@api/cbf'
+import generalFncs from '@utils/general'
 import Reminder from '@models/Reminder'
+import Member from '@models/Member'
 import ICommandsInput from '@types/bot'
+import IMember from '@types/member'
 
 export default {
   async getQuoteString (postId: number, userId: number): Promise<string> {
@@ -32,6 +35,28 @@ export default {
     const comments = await vkApi.board.getComments({ groupId: cmmId, topicId: topicId })
 
     return comments.items[0].id === postId
+  },
+
+  async updateMemberPosts (cmmId: number, userId: number): Promise<void> {
+    // Get reminders that are past current day
+    const member = await Member.findOne({ cmmId, userId })
+    const weekNumber = generalFncs.weeksBetween(new Date(process.env.INITIAL_DATE), new Date())
+
+    // If member doesn't exists, create it with the new post
+    if (!member) {
+      const posts = []
+      posts[weekNumber] = 1
+
+      Member.create({ cmmId, userId, posts })
+
+      return
+    }
+
+    // If member is already created, just update posts
+    const posts = member.posts
+    posts[weekNumber] = (posts[weekNumber] || 0) + 1
+
+    await member.updateOne({ posts })
   },
 
   getTopicDataFromMessage (message: string): { cmm: number; tid: number; } | null {

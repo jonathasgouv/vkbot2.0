@@ -15,13 +15,17 @@ export default {
 
       const { group_id: cmmId } = req.body
       const { topic_id: topicId, from_id: userId, id: postId, text: message } = req.body.object
+      const banned = JSON.parse(process.env.BANNED_IDS || '[]')
 
       // Check if post is from a new topic
       // const isNewTopic = await bot.isTopic(cmmId, topicId, postId)
+      
+      // Check if member is banned from using the bot
+      if (banned.includes(userId)) return res.status(200).send('ok')
 
       // Updates member posts number on db
       await bot.updateMemberPosts(cmmId, userId)
-
+      
       // Check if there is a command
       const command = bot.getCommand(message)
       if (!command) return res.status(200).send('ok')

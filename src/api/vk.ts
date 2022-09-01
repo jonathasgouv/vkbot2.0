@@ -7,6 +7,13 @@ interface ICreateBoardComment {
     attachments?: string[];
 }
 
+interface IAddTopic {
+  cmmId: number;
+  title: string;
+  text: string;
+  attachments?: string[];
+}
+
 interface IGetTopicsComments {
   groupId: number;
   topicIds: number[];
@@ -61,6 +68,21 @@ export default {
       }
 
       const response = await vkApi.get('/board.createComment', { params: queryParams })
+
+      return response.data.response
+    },
+
+    async addTopic (data: IAddTopic) {
+      const attachments = data?.attachments?.join(',')
+
+      const queryParams = {
+        group_id: data.cmmId,
+        title: data.title,
+        text: data.text,
+        attachments
+      }
+
+      const response = await vkApi.get('/board.addTopic', { params: queryParams })
 
       return response.data.response
     },

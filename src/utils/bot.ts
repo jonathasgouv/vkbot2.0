@@ -13,6 +13,13 @@ export default {
 
     return `[post${postId}|${firstName}],`
   },
+  
+  async getTagString (userId: number): Promise<string> {
+    const userData = await vkApi.users.get({ userIds: [userId] })
+    const {first_name, last_name} = userData[0]
+
+    return `[id${userId}|${first_name} ${last_name}]`
+  },
 
   async getGamesFormatted (serie?: string): Promise<string> {
     const games = await cbfApi.getGames()

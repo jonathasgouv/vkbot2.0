@@ -23,9 +23,7 @@ export default {
                 text: await this.getMostPostsText(membersWithMostPosts),
             }
 
-            console.log(topicData)
-
-             // await vkApi.board.addTopic(topicData)
+            await vkApi.board.addTopic(topicData)
         })
     },
 

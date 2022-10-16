@@ -3,8 +3,7 @@ import cbfApi from '@api/cbf'
 import generalFncs from '@utils/general'
 import Reminder from '@models/Reminder'
 import Member from '@models/Member'
-import ICommandsInput from '@types/bot'
-import IMember from '@types/member'
+import ICommandsInput from "@types/bot";
 
 export default {
   async getQuoteString (postId: number, userId: number): Promise<string> {

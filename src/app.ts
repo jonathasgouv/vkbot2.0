@@ -14,7 +14,7 @@ app.use(express.urlencoded({ extended: true }))
 app.use('/api/hook', hookRouter)
 
 app.get('/', (request, response) => {
-  return response.send('bip bop')
+	return response.send('bip bop')
 })
 
 export default app

@@ -1,5 +1,5 @@
-import mongoose from '@config/database';
-import ITopic from '@types/topic';
+import mongoose from '@config/database'
+import ITopic from '@types/topic'
 
 // Create a Schema corresponding to the document interface
 const TopicSchema = new mongoose.Schema<ITopic>(
@@ -36,9 +36,9 @@ const TopicSchema = new mongoose.Schema<ITopic>(
 			max: 5000,
 		},
 	}
-);
+)
 
 // Create a Model
-const Topic = mongoose.model<ITopic>('Topic', TopicSchema);
+const Topic = mongoose.model<ITopic>('Topic', TopicSchema)
 
-export default Topic;
+export default Topic

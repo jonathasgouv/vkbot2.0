@@ -1,6 +1,6 @@
-import mongoose from 'mongoose';
+import mongoose from 'mongoose'
 
-mongoose.connect(process.env.MONGODBURL);
-mongoose.Promise = global.Promise;
+mongoose.connect(process.env.MONGODBURL)
+mongoose.Promise = global.Promise
 
-export default mongoose;
+export default mongoose

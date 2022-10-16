@@ -1,5 +1,5 @@
-import mongoose from '@config/database';
-import IReminder from '@types/reminder';
+import mongoose from '@config/database'
+import IReminder from '@types/reminder'
 
 // Create a Schema corresponding to the document interface
 const ReminderSchema = new mongoose.Schema<IReminder>(
@@ -34,9 +34,9 @@ const ReminderSchema = new mongoose.Schema<IReminder>(
 		},
 	},
 	{ collection: 'reminder' }
-);
+)
 
 // Create a Model
-const Reminder = mongoose.model<IReminder>('Reminder', ReminderSchema);
+const Reminder = mongoose.model<IReminder>('Reminder', ReminderSchema)
 
-export default Reminder;
+export default Reminder

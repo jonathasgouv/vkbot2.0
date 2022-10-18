@@ -4,20 +4,20 @@ import bot from '@utils/bot'
 
 export default {
 	async saveTopics(): Promise<void> {
+		console.info('Saving topics')
+
 		const cmms = await Member.distinct('cmmId')
 
 		cmms.forEach(async (cmm) => {
 			const topics = await bot.getLastTopics(100, cmm)
 
-			Topic.bulkWrite(
-				topics.map((topic) => ({
-					updateOne: {
-						filter: { _id: topic._id },
-						update: {$setOnInsert : { $set: topic }},
-						upsert: true,
-					},
-				}))
-			)
+			topics.forEach(async topic => {
+				const alreadyExists = await Topic.findById(topic._id)
+
+				if (!alreadyExists) Topic.create(topic)
+			})
+
+			console.info('Topics saved successfully')
 		})
 	},
 }

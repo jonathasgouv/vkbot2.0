@@ -19,6 +19,7 @@ const getMostPostsText = async (members: IMember[]): Promise<string> => {
 
 export default {
 	async mostPosts(numberOfMembers: number): Promise<void> {
+		console.info('Creating most posts topic')
 		// Get all communities
 		const cmms = await Member.distinct('cmmId')
 
@@ -39,6 +40,8 @@ export default {
 			}
 
 			await vkApi.board.addTopic(topicData)
+
+			console.info('Most posts topic created sucessfully')
 		})
 	},
 }

@@ -11,7 +11,7 @@ cron.schedule('0 17 * * SAT', () => members.mostPosts(8), {
 	scheduled: true,
 	timezone: 'America/Sao_Paulo',
 })
-cron.schedule('*/20 * * * *', topics.saveTopics, {
+cron.schedule('*/10 * * * *', topics.saveTopics, {
 	scheduled: true,
 	timezone: 'America/Sao_Paulo',
 })

@@ -4,6 +4,8 @@ import bot from '@utils/bot'
 
 export default {
 	async sendResponses(): Promise<void> {
+		console.info('Checking reminders')
+
 		// Get reminders that are past current day
 		const reminders = await Reminder.find({
 			expires: { $lte: new Date() },
@@ -24,5 +26,7 @@ export default {
 			// Delete reminder from database
 			reminder.delete()
 		})
+
+		console.info('Reminders answered successfully')
 	},
 }

@@ -309,6 +309,8 @@ export default {
 	async saveToTopic(data: ICommandsInput): Promise<void> {
 		const { topicId, cmmId, message } = data
 		const { cmm: cmmFromMessage, tid: tidFromMessage } = this.getTopicDataFromMessage(message)
+		const topicTitle = await this.getTopicTitle(cmmId, topicId)
+
 
 		if (!cmmFromMessage || !tidFromMessage) return
 

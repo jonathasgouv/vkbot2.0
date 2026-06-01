@@ -369,7 +369,7 @@
 		async function loadRanking() {
 			const mainContent = document.getElementById('main-content');
 			try {
-				const response = await fetch('/api/ranking');
+				const response = await fetch(`/api/ranking${window.location.search}`);
 				if (!response.ok) throw new Error('Falha ao obter o ranking');
 				
 				const data = await response.json();

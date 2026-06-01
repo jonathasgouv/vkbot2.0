@@ -801,8 +801,9 @@ ${badgesList}`
 		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
 
 		try {
+			const botId = parseInt(process.env.BOT_ID || '0')
 			const betsAggregation = await Bet.aggregate([
-				{ $match: { cmmId, processed: true } },
+				{ $match: { cmmId, processed: true, userId: { $ne: botId } } },
 				{ $group: { _id: '$userId', totalPoints: { $sum: '$points' } } },
 				{ $sort: { totalPoints: -1 } },
 				{ $limit: 10 }
@@ -841,8 +842,9 @@ ${badgesList}`
 		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
 
 		try {
+			const botId = parseInt(process.env.BOT_ID || '0')
 			const members = await Member.aggregate([
-				{ $match: { cmmId } },
+				{ $match: { cmmId, userId: { $ne: botId } } },
 				{ $addFields: { totalPosts: {
 					$reduce: {
 						input: { $ifNull: ['$posts', []] },

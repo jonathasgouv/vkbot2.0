@@ -70,6 +70,10 @@ Os comandos do bot devem ser digitados em tópicos de discussão do VK e iniciad
 | `!ranking` | `!rk` | `-m` | Exibe o Top 10 de pontuadores acumulados do Bolão da comunidade. |
 | `!rankingrpg` | `!rkpf` | `-m` | Exibe o Top 10 de Nível/Posts do RPG de postagens da comunidade. |
 | `!wiki` | `!w` | `-m` `[termo]` | Pesquisa e exibe o resumo e link de um artigo na Wikipédia em português. |
+| `!resumo` | `!rs` | `-m` | Gera um resumo de inteligência artificial (Gemini) das discussões do tópico atual (cooldown de 1h para membros comuns). |
+| `!monitorar` | `!mon` | `-e` `-d` `[termo]` | Cadastra termo para receber notificação privada (DM) quando for citado. `-e` busca palavra exata, `-d` remove. |
+| `!desmonitorar` | `!dmon` | `[termo]` | Cancela o monitoramento de uma palavra-chave específica. |
+| `!monitorados` | `!mons` | - | Lista todas as palavras-chave ativas que o usuário monitora nesta comunidade. |
 
 ---
 
@@ -115,12 +119,14 @@ As medalhas e conquistas ganhas pelos membros são computadas automaticamente e 
 
 ## 🏆 Painel de Classificação Web
 O bot dispõe de um painel web moderno com suporte a visualização de rankings em tempo real:
-- **URL**: `/ranking` (Página Web com visualização lado a lado do Top 20 RPG e Top 20 Bolão).
+- **URL**: `/ranking` (Página Web com visualização lado a lado do Top 50 RPG e Top 50 Bolão).
 - **Recursos**:
   - Estilo moderno Dark Mode Premium com Glassmorphism (vidro desfocado).
   - Fotos e avatares oficiais integrados com links aos perfis dos usuários no VK (`https://vk.com/id{userId}`).
   - Barras de progresso animadas e listagem dinâmica de conquistas e medalhas individuais.
-  - **Cache de API de 5 minutos** em `/api/ranking` para otimizar acessos ao MongoDB e API do VK.
+  - **Filtro de Períodos**: Botões interativos em gradiente para alternar entre as classificações Geral, Semana, Mês ou Ano.
+  - **Barra de Pesquisa de Membro**: Campo de busca com debounce (300ms) para pesquisar qualquer membro por nome ou ID e visualizar seu cartão com sua posição absoluta real (mesmo fora do Top 50).
+  - **Resolução Otimizada**: Cache de perfis do VK em memória (`vkUserCache`) com TTL de 30 minutos e cache global da API (`rankingCache`) de 5 minutos por combinação de filtros.
 
 ---
 

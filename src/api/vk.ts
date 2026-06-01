@@ -130,4 +130,19 @@ export default {
 			return response.data.response
 		},
 	},
+
+	groups: {
+		async getMembers(data: { groupId: number; filter?: string }) {
+			const queryParams = {
+				group_id: data.groupId,
+				filter: data.filter,
+			}
+
+			const response = await vkApi.get('/groups.getMembers', {
+				params: queryParams,
+			})
+
+			return response.data.response
+		},
+	},
 }

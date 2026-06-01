@@ -7,8 +7,11 @@ import Member from '@models/Member'
 import Topic from '@models/Topic'
 import BolaoRound from '@models/BolaoRound'
 import Bet from '@models/Bet'
+import axios from 'axios'
 import type ICommandsInput from '@appTypes/bot'
 import type ITopic from '@appTypes/topic'
+
+const resumoCooldowns = new Map<string, number>()
 
 export default {
 	async getQuoteString(postId: number, userId: number): Promise<string> {
@@ -252,6 +255,7 @@ export default {
 			rankingrpg: this.sendRpgRanking,
 			wiki: this.searchWiki,
 			vs: this.sendComparison,
+			resumo: this.sendTopicSummary,
 		}
 
 		// Shorthand versions of commands
@@ -269,6 +273,7 @@ export default {
 			rk: 'ranking',
 			rkpf: 'rankingrpg',
 			w: 'wiki',
+			rs: 'resumo',
 		}
 
 		// If it is a shorthand transpiles it to complete version
@@ -716,6 +721,163 @@ ${badgesList}`
 
 		} catch (error) {
 			console.error('Erro ao realizar comparativo direto:', error)
+		}
+	},
+
+	async sendTopicSummary(data: ICommandsInput): Promise<void> {
+		const { topicId, cmmId, postId, userId, message } = data
+		const params = this.getCommandParameters(message)
+		const isMessage = params?.includes('m')
+		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
+
+		try {
+			// 1. Verificar se é administrador/moderador (manager) no VK
+			let isMod = false
+			try {
+				const managersResponse = await vkApi.groups.getMembers({
+					groupId: cmmId,
+					filter: 'managers',
+				})
+				if (managersResponse && managersResponse.items) {
+					isMod = managersResponse.items.some((m: any) => m.id === userId)
+				}
+			} catch (err) {
+				console.error('Erro ao verificar moderadores:', err)
+			}
+
+			// 2. Verificar Cooldown (1h) se não for moderador
+			const cooldownKey = `${cmmId}_${topicId}`
+			if (!isMod) {
+				const nextAvailable = resumoCooldowns.get(cooldownKey) || 0
+				if (Date.now() < nextAvailable) {
+					const remainingMs = nextAvailable - Date.now()
+					const remainingMin = Math.ceil(remainingMs / (60 * 1000))
+					const responseText = `${quote} ⚠️ O comando !resumo possui cooldown de 1h por tópico. Tempo restante: ${remainingMin} minuto(s).`
+					
+					isMessage
+						? await vkApi.messages.send({ peerId: userId, message: responseText })
+						: await vkApi.board.createComment({ topicId, cmmId, text: responseText })
+					return
+				}
+			}
+
+			// 3. Obter primeiros 50 comentários
+			const firstCommentsResponse = await vkApi.board.getComments({
+				groupId: cmmId,
+				topicId,
+				count: 50,
+				sort: 'asc',
+			})
+
+			if (!firstCommentsResponse || !firstCommentsResponse.items || firstCommentsResponse.items.length === 0) {
+				const responseText = `${quote} Não há comentários suficientes para resumir.`
+				isMessage
+					? await vkApi.messages.send({ peerId: userId, message: responseText })
+					: await vkApi.board.createComment({ topicId, cmmId, text: responseText })
+				return
+			}
+
+			let allComments = [...firstCommentsResponse.items]
+			const totalCount = firstCommentsResponse.count || 0
+
+			// 4. Se houver mais de 50 comentários, buscar os últimos 50
+			if (totalCount > 50) {
+				const offset = Math.max(50, totalCount - 50)
+				const lastCommentsResponse = await vkApi.board.getComments({
+					groupId: cmmId,
+					topicId,
+					count: 50,
+					sort: 'asc',
+					offset,
+				})
+				if (lastCommentsResponse && lastCommentsResponse.items) {
+					allComments = [...allComments, ...lastCommentsResponse.items]
+				}
+			}
+
+			// 5. Remover duplicados (por id)
+			const uniqueComments = Array.from(
+				new Map(allComments.map((c) => [c.id, c])).values()
+			)
+
+			// 6. Filtrar comentários irrelevantes (comandos, bot, etc.)
+			const botId = parseInt(process.env.BOT_ID || '0')
+			const filteredComments = uniqueComments.filter((c) => {
+				const isBot = c.from_id === botId || c.from_id === -botId || c.from_id === -cmmId
+				const isCommand = c.text?.trim().startsWith('!')
+				return !isBot && !isCommand && c.text?.trim()
+			})
+
+			if (filteredComments.length === 0) {
+				const responseText = `${quote} Não há comentários relevantes para resumir.`
+				isMessage
+					? await vkApi.messages.send({ peerId: userId, message: responseText })
+					: await vkApi.board.createComment({ topicId, cmmId, text: responseText })
+				return
+			}
+
+			// 7. Obter nomes reais dos usuários em lote
+			const senderIds = Array.from(new Set(filteredComments.map((c) => c.from_id).filter((id) => id > 0)))
+			let vkUsers: any[] = []
+			if (senderIds.length > 0) {
+				try {
+					vkUsers = await vkApi.users.get({ userIds: senderIds })
+				} catch (err) {
+					console.error('Erro ao buscar usuários do VK em lote:', err)
+				}
+			}
+
+			// 8. Formatar mensagens para enviar ao Gemini
+			const formattedMessages = filteredComments
+				.map((c) => {
+					const vkUser = vkUsers.find((u) => u.id === c.from_id)
+					const name = vkUser ? `${vkUser.first_name} ${vkUser.last_name}` : `Membro ${c.from_id}`
+					return `[${name}]: ${c.text}`
+				})
+				.join('\n')
+
+			// 9. Chamar API do Gemini
+			const geminiKey = process.env.GEMINI_API_KEY
+			if (!geminiKey) {
+				throw new Error('Chave de API do Gemini (GEMINI_API_KEY) não configurada.')
+			}
+
+			const prompt = `Você é um assistente de moderação de fórum. Abaixo estão as postagens iniciais e finais de uma discussão em nossa comunidade sobre Cartola FC e futebol.
+Escreva um resumo claro, conciso e direto em português (máximo de 2 a 3 parágrafos) destacando os principais tópicos debatidos pelos membros, as opiniões predominantes e os destaques.
+
+Comentários do tópico:
+${formattedMessages}
+
+Resumo:`
+
+			const geminiResponse = await axios.post(
+				`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+				{
+					contents: [{ parts: [{ text: prompt }] }]
+				}
+			)
+
+			const summary = geminiResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text
+			if (!summary) {
+				throw new Error('Falha ao obter o resumo da IA.')
+			}
+
+			// 10. Responder no fórum e setar cooldown
+			const responseText = `${quote}\n📝 *Resumo do Tópico (IA)* 📝\n\n${summary.trim()}`
+
+			isMessage
+				? await vkApi.messages.send({ peerId: userId, message: responseText })
+				: await vkApi.board.createComment({ topicId, cmmId, text: responseText })
+
+			if (!isMod) {
+				resumoCooldowns.set(cooldownKey, Date.now() + 60 * 60 * 1000) // Cooldown de 1h
+			}
+		} catch (error: any) {
+			console.error('Erro ao gerar resumo do tópico:', error)
+			const errorText = `${quote} Desculpe, ocorreu um erro ao tentar resumir as discussões deste tópico.`
+			isMessage
+				? await vkApi.messages.send({ peerId: userId, message: errorText })
+				: await vkApi.board.createComment({ topicId, cmmId, text: errorText })
 		}
 	},
 

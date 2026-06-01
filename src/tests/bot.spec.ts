@@ -32,7 +32,9 @@ jest.mock('@api/cbf', () => {
 
 const mockSend = jest.fn().mockResolvedValue(null)
 const mockCreateComment = jest.fn().mockResolvedValue(null)
+const mockGetComments = jest.fn().mockResolvedValue({ count: 0, items: [] })
 const mockGetUsers = jest.fn().mockResolvedValue([{ first_name: 'John', last_name: 'Doe' }])
+const mockGetMembers = jest.fn().mockResolvedValue({ items: [] })
 
 jest.mock('@api/vk', () => {
 	return {
@@ -43,11 +45,25 @@ jest.mock('@api/vk', () => {
 			},
 			board: {
 				createComment: mockCreateComment,
+				getComments: mockGetComments,
 			},
 			users: {
 				get: mockGetUsers,
+			},
+			groups: {
+				getMembers: mockGetMembers,
 			}
 		},
+	}
+})
+
+const mockAxiosPost = jest.fn()
+jest.mock('axios', () => {
+	return {
+		__esModule: true,
+		default: {
+			post: mockAxiosPost,
+		}
 	}
 })
 
@@ -419,6 +435,166 @@ describe('bot.ts utility functions', () => {
 			expect(mockCreateComment).toHaveBeenCalledWith(
 				expect.objectContaining({
 					text: expect.stringContaining('Vencedor: Jane Smith'),
+				})
+			)
+		})
+	})
+
+	describe('sendTopicSummary', () => {
+		beforeEach(() => {
+			jest.clearAllMocks()
+			mockGetMembers.mockResolvedValue({ items: [] }) // default: not moderator
+			mockGetComments.mockResolvedValue({ count: 0, items: [] })
+			mockAxiosPost.mockResolvedValue({
+				data: {
+					candidates: [{ content: { parts: [{ text: 'Resumo mockado de IA.' }] } }]
+				}
+			})
+			process.env.GEMINI_API_KEY = 'test-api-key'
+		})
+
+		test('should reply with error if no comments are found', async () => {
+			mockGetComments.mockResolvedValue({ count: 0, items: [] })
+
+			await bot.sendTopicSummary({
+				userId: 300,
+				cmmId: 100,
+				topicId: 200,
+				postId: 400,
+				message: '!resumo',
+			})
+
+			expect(mockCreateComment).toHaveBeenCalledWith(
+				expect.objectContaining({
+					cmmId: 100,
+					topicId: 200,
+					text: expect.stringContaining('Não há comentários suficientes para resumir'),
+				})
+			)
+		})
+
+		test('should fetch comments, call Gemini, and post summary', async () => {
+			mockGetComments.mockResolvedValue({
+				count: 2,
+				items: [
+					{ id: 1, from_id: 301, text: 'Gostei da escalação do Hulk!' },
+					{ id: 2, from_id: 302, text: 'Acho melhor ir de Arrascaeta.' },
+				]
+			})
+			mockGetUsers.mockResolvedValue([
+				{ id: 301, first_name: 'Jane', last_name: 'Smith' },
+				{ id: 302, first_name: 'Bob', last_name: 'Johnson' },
+			])
+
+			await bot.sendTopicSummary({
+				userId: 300,
+				cmmId: 100,
+				topicId: 200,
+				postId: 400,
+				message: '!resumo',
+			})
+
+			expect(mockGetComments).toHaveBeenCalledWith(
+				expect.objectContaining({
+					groupId: 100,
+					topicId: 200,
+					count: 50,
+				})
+			)
+
+			expect(mockAxiosPost).toHaveBeenCalledWith(
+				expect.stringContaining('generativelanguage.googleapis.com'),
+				expect.objectContaining({
+					contents: expect.arrayContaining([
+						expect.objectContaining({
+							parts: expect.arrayContaining([
+								expect.objectContaining({
+									text: expect.stringContaining('[Jane Smith]: Gostei da escalação')
+								})
+							])
+						})
+					])
+				})
+			)
+
+			expect(mockCreateComment).toHaveBeenCalledWith(
+				expect.objectContaining({
+					cmmId: 100,
+					topicId: 200,
+					text: expect.stringContaining('Resumo mockado de IA.'),
+				})
+			)
+		})
+
+		test('should enforce 1h cooldown for normal users', async () => {
+			mockGetComments.mockResolvedValue({
+				count: 1,
+				items: [{ id: 1, from_id: 301, text: 'Comentário teste.' }]
+			})
+
+			// First call (sets cooldown)
+			await bot.sendTopicSummary({
+				userId: 300,
+				cmmId: 100,
+				topicId: 999, // new topic
+				postId: 400,
+				message: '!resumo',
+			})
+
+			expect(mockCreateComment).toHaveBeenLastCalledWith(
+				expect.objectContaining({
+					text: expect.stringContaining('Resumo mockado de IA.'),
+				})
+			)
+
+			// Second call (hits cooldown)
+			await bot.sendTopicSummary({
+				userId: 300,
+				cmmId: 100,
+				topicId: 999,
+				postId: 401,
+				message: '!resumo',
+			})
+
+			expect(mockCreateComment).toHaveBeenLastCalledWith(
+				expect.objectContaining({
+					text: expect.stringContaining('⚠️ O comando !resumo possui cooldown de 1h por tópico'),
+				})
+			)
+		})
+
+		test('should bypass cooldown for moderators', async () => {
+			mockGetComments.mockResolvedValue({
+				count: 1,
+				items: [{ id: 1, from_id: 301, text: 'Comentário teste.' }]
+			})
+
+			// Mock user is manager
+			mockGetMembers.mockResolvedValue({
+				items: [{ id: 300, role: 'administrator' }]
+			})
+
+			// First call
+			await bot.sendTopicSummary({
+				userId: 300,
+				cmmId: 100,
+				topicId: 888,
+				postId: 400,
+				message: '!resumo',
+			})
+
+			// Second call should NOT hit cooldown
+			await bot.sendTopicSummary({
+				userId: 300,
+				cmmId: 100,
+				topicId: 888,
+				postId: 401,
+				message: '!resumo',
+			})
+
+			expect(mockCreateComment).toHaveBeenLastCalledWith(
+				expect.objectContaining({
+					text: expect.stringContaining('Resumo mockado de IA.'),
 				})
 			)
 		})

@@ -14,6 +14,7 @@ jest.mock('@config/database', () => {
 				findById: jest.fn(),
 				distinct: jest.fn(),
 				insertMany: jest.fn(),
+				aggregate: jest.fn().mockResolvedValue([]),
 			}),
 		}
 	}
@@ -247,7 +248,7 @@ describe('bot.ts utility functions', () => {
 			)
 			expect(mockCreateComment).toHaveBeenCalledWith(
 				expect.objectContaining({
-					text: expect.stringContaining('⭐ Nível: 4'),
+					text: expect.stringContaining('⭐ Nível: 8'),
 				})
 			)
 			expect(mockCreateComment).toHaveBeenCalledWith(
@@ -299,7 +300,7 @@ describe('bot.ts utility functions', () => {
 			mockFindOneMember.mockResolvedValue({
 				userId: 300,
 				cmmId: 100,
-				posts: [49], // total 49 posts (level 1) -> 50 posts (level 2)
+				posts: [9], // total 9 posts (level 1) -> 10 posts (level 2)
 			})
 			mockGetUsers.mockResolvedValue([{ first_name: 'John', last_name: 'Doe' }])
 			jest.spyOn(bot, 'getQuoteString').mockResolvedValue('[post400|John],')

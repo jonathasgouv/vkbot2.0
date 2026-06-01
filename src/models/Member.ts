@@ -16,6 +16,10 @@ const MembersSchema = new mongoose.Schema<IMembers>(
 			type: ['number'],
 			required: true,
 		},
+		coruja: {
+			type: 'boolean',
+			required: false,
+		},
 	},
 	{ collection: 'members' }
 )

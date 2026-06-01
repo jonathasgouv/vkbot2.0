@@ -68,6 +68,7 @@ Os comandos do bot devem ser digitados em tópicos de discussão do VK e iniciad
 | `!perfil` | `!pf` | `-m` | Exibe o nível (RPG), barra de progresso ASCII, medalhas e lembretes ativos do membro. |
 | `!bolao` | `!b` | `-m` | Envia o link do tópico ativo do Bolão da Rodada atual. |
 | `!ranking` | `!rk` | `-m` | Exibe o Top 10 de pontuadores acumulados do Bolão da comunidade. |
+| `!rankingrpg` | `!rkpf` | `-m` | Exibe o Top 10 de Nível/Posts do RPG de postagens da comunidade. |
 | `!wiki` | `!w` | `-m` `[termo]` | Pesquisa e exibe o resumo e link de um artigo na Wikipédia em português. |
 
 ---
@@ -78,11 +79,10 @@ O bot conta com um sistema de engajamento gamificado (RPG) integrado que acompan
 
 ### 📈 Mecânica de Nível e XP
 - **XP (Pontos de Experiência)**: Cada postagem válida registrada pelo bot concede **10 XP** ao usuário.
-- **Progressão**: O limiar de postagens para subir de nível aumenta de forma incremental a cada nível alcançado:
-  - **Nível 1 ➔ Nível 2**: Necessários 50 posts (500 XP).
-  - **Nível 2 ➔ Nível 3**: Necessários mais 100 posts adicionais (1000 XP).
-  - **Nível 3 ➔ Nível 4**: Necessários mais 150 posts adicionais (1500 XP).
-  - Em geral, alcançar o próximo nível exige `50 * Nível Atual` postagens.
+- **Progressão**: O limiar de postagens para subir de nível segue uma curva de progressão não linear piecewise:
+  - **Até o Nível 10**: Cada nível exige `Nível * 10` posts (Ex: Nível 1➔2 precisa de 10 posts, alcançando o Nível 10 no marco de 450 posts).
+  - **Nível 11 ao Nível 30**: Cada nível exige `100 + (Nível - 10) * 50` posts (Alcançando o Nível 30 no marco de 11.950 posts).
+  - **Acima do Nível 30**: Cada nível exige `1100 + (Nível - 30) * 200` posts (Suporta progressão suave e escalonamento contínuo até mais de 100.000 posts).
 - **Gráfico ASCII**: O comando `!perfil` renderiza uma barra de progresso ASCII dinâmica de 10 blocos (Ex: `[████░░░░░░] 40%`) demonstrando a porcentagem de conclusão para o próximo nível.
 - **Notificação Automática**: Sempre que um usuário atinge os requisitos do próximo nível, o bot envia uma mensagem parabenizando o membro diretamente no fórum da comunidade com sua nova barra de progresso.
 
@@ -96,11 +96,31 @@ As medalhas e conquistas ganhas pelos membros são computadas automaticamente e 
 | **🥇 Ouro** | Alcançar um total acumulado de **2.000 postagens**. |
 | **💎 Platina** | Alcançar um total acumulado de **5.000 postagens**. |
 | **🏆 Lenda** | Alcançar um total acumulado de **10.000 postagens**. |
+| **👑 Imperador** | Alcançar um total acumulado de **25.000 postagens**. |
+| **🚀 Mestre do Cartola** | Alcançar um total acumulado de **50.000 postagens**. |
+| **💫 Mítico** | Alcançar um total acumulado de **75.000 postagens**. |
+| **🔱 Deus do Cartola** | Alcançar um total acumulado de **100.000 postagens**. |
 | **⚡ Pé Quente** | Estar ativo na semana corrente (pelo menos 1 postagem registrada na semana atual). |
 | **🛡️ Pioneiro** | Ter postagens ativas dentro das primeiras 10 semanas de vida útil do bot na comunidade. |
 | **📅 Constante** | Estar ativo (pelo menos 1 postagem) em pelo menos **10 semanas diferentes**. |
 | **🎖️ Veterano** | Estar ativo (pelo menos 1 postagem) em pelo menos **24 semanas diferentes**. |
 | **🔥 Hiperativo** | Registrar **mais de 100 postagens** em uma única semana. |
+| **👴 Old** | Estar ativo na base/comunidade há pelo menos **20 semanas**. |
+| **👶 Modinha** | Estar ativo na base/comunidade há menos de **4 semanas**. |
+| **🦉 Coruja** | Ter registrado ao menos uma postagem de madrugada (entre 00:00 e 05:59 BRT). |
+| **🎯 Pé de Anjo** | Acertar ao menos um palpite exato de placar no Bolão (conquistando 5 pontos). |
+| **👑 Rei do Bolão** | Estar empatado ou isolado na liderança do Ranking Geral do Bolão. |
+
+---
+
+## 🏆 Painel de Classificação Web
+O bot dispõe de um painel web moderno com suporte a visualização de rankings em tempo real:
+- **URL**: `/ranking` (Página Web com visualização lado a lado do Top 20 RPG e Top 20 Bolão).
+- **Recursos**:
+  - Estilo moderno Dark Mode Premium com Glassmorphism (vidro desfocado).
+  - Fotos e avatares oficiais integrados com links aos perfis dos usuários no VK (`https://vk.com/id{userId}`).
+  - Barras de progresso animadas e listagem dinâmica de conquistas e medalhas individuais.
+  - **Cache de API de 5 minutos** em `/api/ranking` para otimizar acessos ao MongoDB e API do VK.
 
 ---
 

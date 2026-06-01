@@ -23,24 +23,32 @@ export default {
 			// Check if member is banned from using the bot
 			if (banned.includes(userId)) return res.status(200).send('ok')
 
-			// Updates member posts number on db
-			await bot.updateMemberPosts(cmmId, userId, topicId, postId)
+			// Send 'ok' immediately to VK to prevent duplicate callback delivery due to timeout retries
+			res.status(200).send('ok')
 
-			// Check if it's a comment in an active Bolao topic
-			const isBolao = await bot.isBolaoTopic(cmmId, topicId)
-			if (isBolao) {
-				await bot.processRoundGuesses(cmmId, userId, topicId, postId, message)
-				return res.status(200).send('ok')
-			}
+			// Process in the background asynchronously
+			Promise.resolve().then(async () => {
+				try {
+					// Updates member posts number on db
+					await bot.updateMemberPosts(cmmId, userId, topicId, postId)
 
-			// Check if there is a command
-			const command = bot.getCommand(message)
-			if (!command) return res.status(200).send('ok')
+					// Check if it's a comment in an active Bolao topic
+					const isBolao = await bot.isBolaoTopic(cmmId, topicId)
+					if (isBolao) {
+						await bot.processRoundGuesses(cmmId, userId, topicId, postId, message)
+						return
+					}
 
-			// If there is a command execute it
-			await bot.execCommand(command, userId, topicId, postId, cmmId, message)
+					// Check if there is a command
+					const command = bot.getCommand(message)
+					if (!command) return
 
-			return res.status(200).send('ok')
+					// If there is a command execute it
+					await bot.execCommand(command, userId, topicId, postId, cmmId, message)
+				} catch (error) {
+					console.error('Erro ao processar mensagem do webhook em segundo plano:', error)
+				}
+			})
 		} catch (error) {
 			console.log('Erro ao processar request', error)
 			return res.status(200).send('ok')

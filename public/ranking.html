@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="description" content="Painel de Classificação de RPG de Níveis e Bolão do Cartola para a comunidade.">
+	<meta property="og:title" content="Painel de Classificação - VKBot">
+	<meta property="og:description" content="Acompanhe as pontuações e o nível de engajamento dos membros.">
+	<title>Painel de Classificação - VKBot</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+	<style>
+		:root {
+			--bg-color: #080d16;
+			--card-bg: rgba(13, 22, 38, 0.7);
+			--border-color: rgba(255, 255, 255, 0.08);
+			--text-main: #f3f4f6;
+			--text-muted: #9ca3af;
+			--primary: #00f2fe;
+			--primary-glow: rgba(0, 242, 254, 0.15);
+			--gold: #ffd700;
+			--gold-glow: rgba(255, 215, 0, 0.15);
+			--success: #10b981;
+			--card-radius: 12px;
+			--transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+		}
+
+		* {
+			box-sizing: border-box;
+			margin: 0;
+			padding: 0;
+		}
+
+		body {
+			font-family: 'Inter', sans-serif;
+			background-color: var(--bg-color);
+			color: var(--text-main);
+			line-height: 1.5;
+			min-height: 100vh;
+			overflow-x: hidden;
+			background-image: 
+				radial-gradient(at 0% 0%, rgba(0, 242, 254, 0.05) 0px, transparent 50%),
+				radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.05) 0px, transparent 50%);
+			background-attachment: fixed;
+		}
+
+		header {
+			padding: 3rem 1.5rem 2rem;
+			text-align: center;
+			max-width: 1200px;
+			margin: 0 auto;
+		}
+
+		h1 {
+			font-family: 'Outfit', sans-serif;
+			font-size: 2.5rem;
+			font-weight: 800;
+			letter-spacing: -0.025em;
+			background: linear-gradient(135deg, #fff 30%, var(--primary) 100%);
+			-webkit-background-clip: text;
+			-webkit-text-fill-color: transparent;
+			margin-bottom: 0.5rem;
+		}
+
+		header p {
+			color: var(--text-muted);
+			font-size: 1.1rem;
+			font-weight: 400;
+		}
+
+		main {
+			max-width: 1400px;
+			margin: 0 auto 5rem;
+			padding: 0 1.5rem;
+			display: grid;
+			grid-template-columns: 1fr;
+			gap: 2.5rem;
+		}
+
+		@media (min-width: 1024px) {
+			main {
+				grid-template-columns: 1.1fr 0.9fr;
+			}
+		}
+
+		.ranking-section {
+			background: var(--card-bg);
+			border: 1px solid var(--border-color);
+			border-radius: var(--card-radius);
+			padding: 2rem;
+			backdrop-filter: blur(16px);
+			-webkit-backdrop-filter: blur(16px);
+			box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+			animation: fadeInUp 0.6s ease-out;
+		}
+
+		.section-header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			margin-bottom: 1.5rem;
+			border-bottom: 1px solid var(--border-color);
+			padding-bottom: 1rem;
+		}
+
+		.section-title {
+			font-family: 'Outfit', sans-serif;
+			font-size: 1.5rem;
+			font-weight: 700;
+			display: flex;
+			align-items: center;
+			gap: 0.75rem;
+		}
+
+		.section-title span.badge {
+			font-size: 0.8rem;
+			background: rgba(255, 255, 255, 0.1);
+			padding: 0.25rem 0.5rem;
+			border-radius: 6px;
+			color: var(--text-main);
+			font-weight: 600;
+		}
+
+		.list-container {
+			display: flex;
+			flex-direction: column;
+			gap: 1rem;
+		}
+
+		/* Member Card Styles */
+		.ranking-item {
+			display: flex;
+			align-items: center;
+			padding: 1rem;
+			background: rgba(255, 255, 255, 0.02);
+			border: 1px solid rgba(255, 255, 255, 0.03);
+			border-radius: 10px;
+			transition: var(--transition);
+			position: relative;
+			overflow: hidden;
+		}
+
+		.ranking-item:hover {
+			transform: translateX(4px);
+			background: rgba(255, 255, 255, 0.04);
+			border-color: rgba(0, 242, 254, 0.2);
+			box-shadow: 0 4px 20px -5px var(--primary-glow);
+		}
+
+		/* Top 3 Special borders */
+		.ranking-item.pos-1 { border-color: rgba(255, 215, 0, 0.25); }
+		.ranking-item.pos-2 { border-color: rgba(192, 192, 192, 0.2); }
+		.ranking-item.pos-3 { border-color: rgba(205, 127, 50, 0.2); }
+
+		.rank-badge {
+			font-family: 'Outfit', sans-serif;
+			font-size: 1.25rem;
+			font-weight: 800;
+			width: 2.5rem;
+			height: 2.5rem;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			border-radius: 50%;
+			margin-right: 1rem;
+			flex-shrink: 0;
+			background: rgba(255, 255, 255, 0.05);
+			color: var(--text-muted);
+		}
+
+		.pos-1 .rank-badge { background: var(--gold-glow); color: var(--gold); }
+		.pos-2 .rank-badge { background: rgba(192, 192, 192, 0.1); color: #c0c0c0; }
+		.pos-3 .rank-badge { background: rgba(205, 127, 50, 0.1); color: #cd7f32; }
+
+		.avatar-container {
+			position: relative;
+			margin-right: 1.25rem;
+			flex-shrink: 0;
+		}
+
+		.avatar {
+			width: 3.5rem;
+			height: 3.5rem;
+			border-radius: 50%;
+			object-fit: cover;
+			border: 2px solid rgba(255, 255, 255, 0.1);
+			transition: var(--transition);
+		}
+
+		.ranking-item:hover .avatar {
+			border-color: var(--primary);
+			transform: scale(1.05);
+		}
+
+		.user-info {
+			flex-grow: 1;
+			min-width: 0;
+		}
+
+		.user-name {
+			font-family: 'Outfit', sans-serif;
+			font-size: 1.1rem;
+			font-weight: 600;
+			color: var(--text-main);
+			text-decoration: none;
+			display: inline-block;
+			margin-bottom: 0.25rem;
+			transition: var(--transition);
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			max-width: 100%;
+		}
+
+		.user-name:hover {
+			color: var(--primary);
+		}
+
+		.user-meta {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.5rem 1rem;
+			font-size: 0.8rem;
+			color: var(--text-muted);
+			align-items: center;
+		}
+
+		.meta-item {
+			display: flex;
+			align-items: center;
+			gap: 0.25rem;
+		}
+
+		.meta-item strong {
+			color: var(--text-main);
+		}
+
+		/* Progress bar styling */
+		.rpg-progress {
+			margin-top: 0.5rem;
+			width: 100%;
+		}
+
+		.progress-track {
+			height: 6px;
+			background: rgba(255, 255, 255, 0.05);
+			border-radius: 3px;
+			overflow: hidden;
+			position: relative;
+		}
+
+		.progress-bar {
+			height: 100%;
+			background: linear-gradient(90deg, var(--primary), var(--success));
+			border-radius: 3px;
+			transition: width 1s ease-out;
+		}
+
+		.progress-text {
+			display: flex;
+			justify-content: space-between;
+			font-size: 0.75rem;
+			color: var(--text-muted);
+			margin-top: 0.25rem;
+		}
+
+		/* Badges */
+		.badges-wrap {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 0.25rem;
+			margin-top: 0.5rem;
+		}
+
+		.badge-tag {
+			font-size: 0.7rem;
+			font-weight: 600;
+			padding: 0.1rem 0.4rem;
+			border-radius: 4px;
+			background: rgba(255, 255, 255, 0.05);
+			border: 1px solid rgba(255, 255, 255, 0.05);
+			color: var(--text-muted);
+		}
+
+		.badge-tag.gold-badge {
+			background: var(--gold-glow);
+			border-color: rgba(255, 215, 0, 0.2);
+			color: var(--gold);
+		}
+
+		/* Scoring card */
+		.score-box {
+			text-align: right;
+			margin-left: 1rem;
+			flex-shrink: 0;
+		}
+
+		.score-val {
+			font-family: 'Outfit', sans-serif;
+			font-size: 1.5rem;
+			font-weight: 700;
+			color: var(--primary);
+		}
+
+		.bolao-score .score-val {
+			color: var(--success);
+		}
+
+		.score-label {
+			font-size: 0.7rem;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+			color: var(--text-muted);
+		}
+
+		/* Animations */
+		@keyframes fadeInUp {
+			from {
+				opacity: 0;
+				transform: translateY(20px);
+			}
+			to {
+				opacity: 1;
+				transform: translateY(0);
+			}
+		}
+
+		/* Spinner */
+		.loading-container {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			padding: 5rem 0;
+			color: var(--text-muted);
+			grid-column: 1 / -1;
+		}
+
+		.spinner {
+			width: 3rem;
+			height: 3rem;
+			border: 4px solid rgba(255, 255, 255, 0.1);
+			border-radius: 50%;
+			border-top-color: var(--primary);
+			animation: spin 1s linear infinite;
+			margin-bottom: 1.5rem;
+		}
+
+		@keyframes spin {
+			to { transform: rotate(360deg); }
+		}
+	</style>
+</head>
+<body>
+	<header>
+		<h1>Painel de Classificação</h1>
+		<p>Comunidade Cartola Bot - Rankings Gerais</p>
+	</header>
+
+	<main id="main-content">
+		<div class="loading-container">
+			<div class="spinner"></div>
+			<p>Buscando dados da Arena...</p>
+		</div>
+	</main>
+
+	<script>
+		async function loadRanking() {
+			const mainContent = document.getElementById('main-content');
+			try {
+				const response = await fetch('/api/ranking');
+				if (!response.ok) throw new Error('Falha ao obter o ranking');
+				
+				const data = await response.json();
+				
+				// Renders layout
+				mainContent.innerHTML = `
+					<!-- RPG Section -->
+					<section class="ranking-section">
+						<div class="section-header">
+							<h2 class="section-title">⭐ RPG de Níveis <span class="badge">Top 20</span></h2>
+						</div>
+						<div class="list-container" id="rpg-list"></div>
+					</section>
+
+					<!-- Bolão Section -->
+					<section class="ranking-section">
+						<div class="section-header">
+							<h2 class="section-title">🏆 Bolão do Cartola <span class="badge">Top 20</span></h2>
+						</div>
+						<div class="list-container" id="bolao-list"></div>
+					</section>
+				`;
+
+				const rpgList = document.getElementById('rpg-list');
+				const bolaoList = document.getElementById('bolao-list');
+
+				// Populate RPG Ranking
+				if (data.rpg && data.rpg.length > 0) {
+					data.rpg.forEach((member, index) => {
+						const posClass = index < 3 ? `pos-${index + 1}` : '';
+						
+						// Render badges dynamically
+						const badgesHTML = member.badges.map(b => {
+							const isSpecial = b.includes('🏆') || b.includes('👑') || b.includes('🚀') || b.includes('💫') || b.includes('🔱') || b.includes('👴');
+							const badgeClass = isSpecial ? 'badge-tag gold-badge' : 'badge-tag';
+							return `<span class="${badgeClass}">${b}</span>`;
+						}).join('');
+
+						rpgList.innerHTML += `
+							<div class="ranking-item ${posClass}">
+								<div class="rank-badge">${index + 1}</div>
+								<div class="avatar-container">
+									<img src="${member.photo}" alt="${member.name}" class="avatar">
+								</div>
+								<div class="user-info">
+									<a href="https://vk.com/id${member.userId}" target="_blank" class="user-name">${member.name}</a>
+									<div class="user-meta">
+										<div class="meta-item">Nível <strong>${member.level}</strong></div>
+										<div class="meta-item">Casa: <strong>${member.houseTime}</strong></div>
+									</div>
+									<div class="rpg-progress">
+										<div class="progress-track">
+											<div class="progress-bar" style="width: ${member.percentage}%"></div>
+										</div>
+										<div class="progress-text">
+											<span>XP: ${member.progressBar}</span>
+											<span>${member.percentage}%</span>
+										</div>
+									</div>
+									<div class="badges-wrap">
+										${badgesHTML}
+									</div>
+								</div>
+								<div class="score-box">
+									<div class="score-val">${member.totalPosts}</div>
+									<div class="score-label">posts</div>
+								</div>
+							</div>
+						`;
+					});
+				} else {
+					rpgList.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem;">Nenhum membro registrado no RPG.</p>';
+				}
+
+				// Populate Bolão Ranking
+				if (data.bolao && data.bolao.length > 0) {
+					data.bolao.forEach((betUser, index) => {
+						const posClass = index < 3 ? `pos-${index + 1}` : '';
+						bolaoList.innerHTML += `
+							<div class="ranking-item ${posClass}">
+								<div class="rank-badge">${index + 1}</div>
+								<div class="avatar-container">
+									<img src="${betUser.photo}" alt="${betUser.name}" class="avatar">
+								</div>
+								<div class="user-info">
+									<a href="https://vk.com/id${betUser.userId}" target="_blank" class="user-name">${betUser.name}</a>
+									<div class="user-meta">
+										<div class="meta-item">Competidor Oficial</div>
+									</div>
+								</div>
+								<div class="score-box bolao-score">
+									<div class="score-val">${betUser.points}</div>
+									<div class="score-label">pontos</div>
+								</div>
+							</div>
+						`;
+					});
+				} else {
+					bolaoList.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem;">Nenhum palpite computado ainda.</p>';
+				}
+
+			} catch (error) {
+				console.error(error);
+				mainContent.innerHTML = `
+					<div class="loading-container" style="color: #ef4444;">
+						<p>⚠️ Ocorreu um erro ao carregar as pontuações.</p>
+						<p style="font-size: 0.9rem; margin-top: 0.5rem;">Verifique a conexão ou tente novamente mais tarde.</p>
+					</div>
+				`;
+			}
+		}
+
+		window.addEventListener('DOMContentLoaded', loadRanking);
+	</script>
+</body>
+</html>

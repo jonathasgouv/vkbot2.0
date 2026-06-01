@@ -150,18 +150,25 @@ export default {
 		const totalPostsBefore = member?.posts?.reduce((acc, curr) => acc + (curr || 0), 0) || 0
 		const totalPostsAfter = totalPostsBefore + 1
 
+		const brtHour = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' })).getHours()
+		const isMidnightRange = brtHour >= 0 && brtHour < 6
+
 		// If member doesn't exists, create it with the new post
 		if (!member) {
 			const posts = []
 			posts[weekNumber] = 1
 
-			await Member.create({ cmmId, userId, posts })
+			await Member.create({ cmmId, userId, posts, coruja: isMidnightRange ? true : undefined })
 		} else {
 			// If member is already created, just update posts
 			const posts = member.posts
 			posts[weekNumber] = (posts[weekNumber] || 0) + 1
 
-			await Member.updateOne({ _id: member._id }, { posts })
+			const updateFields: any = { posts }
+			if (isMidnightRange && !member.coruja) {
+				updateFields.coruja = true
+			}
+			await Member.updateOne({ _id: member._id }, updateFields)
 		}
 
 		// Detect and notify Level Up
@@ -230,7 +237,7 @@ export default {
 	},
 
 	async execCommand(command: string, userId: number, topicId: number, postId: number, cmmId: number, message: string): Promise<void> {
-		const fncts = {
+		const fncts: any = {
 			citar: this.quotePost,
 			tag: this.quotePostWithTag,
 			like: this.likePost,
@@ -242,11 +249,12 @@ export default {
 			perfil: this.sendProfile,
 			bolao: this.sendBolaoLink,
 			ranking: this.sendRanking,
+			rankingrpg: this.sendRpgRanking,
 			wiki: this.searchWiki,
 		}
 
 		// Shorthand versions of commands
-		const commandShort = {
+		const commandShort: any = {
 			c: 'citar',
 			t: 'tag',
 			l: 'like',
@@ -258,6 +266,7 @@ export default {
 			pf: 'perfil',
 			b: 'bolao',
 			rk: 'ranking',
+			rkpf: 'rankingrpg',
 			w: 'wiki',
 		}
 
@@ -425,13 +434,34 @@ export default {
 		// 4. Buscar lembretes pendentes
 		const remindersCount = await Reminder.countDocuments({ userId, cmmId })
 
-		// 5. Calcular conquistas/medalhas
+		// 5. Calcular tempo de casa
+		let weeksOfHouse = 0
+		let monthsOfHouse = 0
+		let houseTimeString = '0 meses (0 semanas)'
+		let firstActiveWeek = -1
+		if (member && member.posts) {
+			firstActiveWeek = member.posts.findIndex((p) => (p || 0) > 0)
+			if (firstActiveWeek !== -1) {
+				const joinDate = new Date(initialDate.getTime() + firstActiveWeek * 7 * 24 * 60 * 60 * 1000)
+				const diffTime = Math.abs(new Date().getTime() - joinDate.getTime())
+				weeksOfHouse = Math.floor(diffTime / (7 * 24 * 60 * 60 * 1000))
+				monthsOfHouse = Math.floor(weeksOfHouse / 4.34)
+				houseTimeString = `${monthsOfHouse} meses (${weeksOfHouse} semanas)`
+			}
+		}
+
+		// 6. Calcular conquistas/medalhas
 		const badges: string[] = []
 		if (totalPosts >= 100) badges.push('🥉 Bronze (100+ posts)')
 		if (totalPosts >= 500) badges.push('🥈 Prata (500+ posts)')
 		if (totalPosts >= 2000) badges.push('🥇 Ouro (2.000+ posts)')
 		if (totalPosts >= 5000) badges.push('💎 Platina (5.000+ posts)')
 		if (totalPosts >= 10000) badges.push('🏆 Lenda (10.000+ posts)')
+		if (totalPosts >= 25000) badges.push('👑 Imperador (25.000+ posts)')
+		if (totalPosts >= 50000) badges.push('🚀 Mestre do Cartola (50.000+ posts)')
+		if (totalPosts >= 75000) badges.push('💫 Mítico (75.000+ posts)')
+		if (totalPosts >= 100000) badges.push('🔱 Deus do Cartola (100.000+ posts)')
+
 		if (weeklyPosts > 0) badges.push('⚡ Pé Quente (Ativo esta semana)')
 		
 		// Pioneiro: postagens registradas nas primeiras 10 semanas de vida do bot
@@ -449,9 +479,50 @@ export default {
 		const hasHyperactiveWeek = member?.posts?.some((posts) => posts >= 100)
 		if (hasHyperactiveWeek) badges.push('🔥 Hiperativo (100+ posts em 1 semana)')
 
+		// Tempo de Casa badges
+		if (firstActiveWeek !== -1) {
+			if (weeksOfHouse >= 20) {
+				badges.push('👴 Old (Membro antigo)')
+			} else if (weeksOfHouse <= 4) {
+				badges.push('👶 Modinha (Membro recente)')
+			}
+		}
+
+		// Coruja: postou de madrugada (entre 00:00 e 05:59 BRT)
+		if (member?.coruja) {
+			badges.push('🦉 Coruja (Postou de madrugada)')
+		}
+
+		// Pé de Anjo: acertou ao menos um placar exato no Bolão (5 pontos)
+		const peDeAnjoBet = await Bet.findOne({ userId, points: 5 })
+		if (peDeAnjoBet) {
+			badges.push('🎯 Pé de Anjo (Acertou placar exato no Bolão)')
+		}
+
+		// Rei do Bolão: primeiro lugar geral do ranking de pontuação do Bolão
+		const bolaoRanking = await Bet.aggregate([
+			{ $match: { cmmId, processed: true } },
+			{ $group: { _id: '$userId', totalPoints: { $sum: '$points' } } },
+			{ $sort: { totalPoints: -1 } },
+			{ $limit: 1 }
+		])
+		if (bolaoRanking.length > 0) {
+			const topPoints = bolaoRanking[0].totalPoints
+			if (topPoints > 0) {
+				const userBolaoPoints = await Bet.aggregate([
+					{ $match: { cmmId, userId, processed: true } },
+					{ $group: { _id: '$userId', totalPoints: { $sum: '$points' } } }
+				])
+				const userPoints = userBolaoPoints[0]?.totalPoints || 0
+				if (userPoints === topPoints) {
+					badges.push('👑 Rei do Bolão (Líder do Bolão)')
+				}
+			}
+		}
+
 		const badgesList = badges.length > 0 ? badges.join('\n') : 'Nenhuma medalha ainda :('
 
-		// 6. Formatar mensagem de perfil
+		// 7. Formatar mensagem de perfil
 		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
 		const responseMessage = `${quote} estatísticas na comunidade de ${userTag}:
 
@@ -460,12 +531,13 @@ ${lvlInfo.progressBar} ${lvlInfo.percentage}%
 
 📝 Total de postagens: ${totalPosts}
 📅 Postagens nesta semana: ${weeklyPosts}
+📅 Tempo de casa: ${houseTimeString}
 ⏰ Lembretes pendentes: ${remindersCount}
 
 🏆 Medalhas ganhas:
 ${badgesList}`
 
-		// 7. Enviar resposta via DM ou fórum
+		// 8. Enviar resposta via DM ou fórum
 		isMessage
 			? await vkApi.messages.send({ peerId: userId, message: responseMessage })
 			: await vkApi.board.createComment({ topicId, cmmId, text: responseMessage })
@@ -584,6 +656,47 @@ ${badgesList}`
 				: await vkApi.board.createComment({ topicId, cmmId, text })
 		} catch (error) {
 			console.error('Erro ao buscar ranking do bolão:', error)
+		}
+	},
+	async sendRpgRanking(data: ICommandsInput): Promise<void> {
+		const { topicId, cmmId, postId, userId, message } = data
+		const params = this.getCommandParameters(message)
+		const isMessage = params?.includes('m')
+		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
+
+		try {
+			const members = await Member.aggregate([
+				{ $match: { cmmId } },
+				{ $addFields: { totalPosts: { $sum: '$posts' } } },
+				{ $sort: { totalPosts: -1 } },
+				{ $limit: 10 }
+			])
+
+			if (members.length === 0) {
+				const responseText = `${quote} Nenhum membro registrado no RPG ainda.`
+				isMessage
+					? await vkApi.messages.send({ peerId: userId, message: responseText })
+					: await vkApi.board.createComment({ topicId, cmmId, text: responseText })
+				return
+			}
+
+			const userIds = members.map(m => m.userId)
+			const vkUsers = await vkApi.users.get({ userIds })
+
+			const rankingLines = members.map((row, idx) => {
+				const vkUser = vkUsers.find((u: any) => u.id === row.userId)
+				const name = vkUser ? `${vkUser.first_name} ${vkUser.last_name}` : `Membro ${row.userId}`
+				const lvlInfo = generalFncs.getLevelInfo(row.totalPosts)
+				return `${idx + 1}. [id${row.userId}|${name}] - Nível ${lvlInfo.level} (${row.totalPosts} posts)`
+			})
+
+			const text = `${quote}\n🏆 *Ranking Geral do RPG* 🏆\n\n${rankingLines.join('\n')}`
+
+			isMessage
+				? await vkApi.messages.send({ peerId: userId, message: text })
+				: await vkApi.board.createComment({ topicId, cmmId, text })
+		} catch (error) {
+			console.error('Erro ao buscar ranking do RPG:', error)
 		}
 	},
 

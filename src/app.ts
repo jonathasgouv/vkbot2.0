@@ -162,19 +162,28 @@ app.get('/api/ranking', async (request, response) => {
 			...bolao.map(b => Number(b._id))
 		])).filter(id => typeof id === 'number' && !isNaN(id) && id > 0)
 
-		// Optimize name resolution: if search is empty, only fetch profiles for top 50 displayed users.
-		// Otherwise, fetch all of them to allow client-side searching by name.
-		const targetUserIds = searchQuery
-			? allUserIds
-			: Array.from(new Set([
+		// Optimize name resolution: 
+		// 1. If search is empty, only fetch profiles for the top 50 displayed users.
+		// 2. If search is numeric, only fetch profile for that specific user.
+		// 3. Otherwise (name search), fetch all to allow substring matching.
+		let targetUserIds: number[] = []
+		if (!searchQuery) {
+			targetUserIds = Array.from(new Set([
 				...members.slice(0, 50).map(m => Number(m.userId)),
 				...bolao.slice(0, 50).map(b => Number(b._id))
-			])).filter(id => typeof id === 'number' && !isNaN(id) && id > 0)
+			]))
+		} else if (/^\d+$/.test(searchQuery)) {
+			targetUserIds = [Number(searchQuery)]
+		} else {
+			targetUserIds = allUserIds
+		}
 
-		const missingUserIds = targetUserIds.filter(id => {
-			const cachedUser = vkUserCache.get(id)
-			return !cachedUser || (now - cachedUser.timestamp > VK_USER_CACHE_TTL)
-		})
+		const missingUserIds = targetUserIds
+			.filter(id => typeof id === 'number' && !isNaN(id) && id > 0)
+			.filter(id => {
+				const cachedUser = vkUserCache.get(id)
+				return !cachedUser || (now - cachedUser.timestamp > VK_USER_CACHE_TTL)
+			})
 
 		if (missingUserIds.length > 0) {
 			for (let i = 0; i < missingUserIds.length; i += 100) {
@@ -194,9 +203,9 @@ app.get('/api/ranking', async (request, response) => {
 							})
 						}
 					}
-					// Add a small 100ms delay between chunks to respect rate limits if we are fetching multiple pages
+					// Add a small 50ms delay between chunks to respect rate limits if we are fetching multiple pages
 					if (missingUserIds.length > 100 && i + 100 < missingUserIds.length) {
-						await new Promise(resolve => setTimeout(resolve, 100))
+						await new Promise(resolve => setTimeout(resolve, 50))
 					}
 				} catch (err) {
 					console.error('Error fetching missing VK users:', err)

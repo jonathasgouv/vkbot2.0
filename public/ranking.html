@@ -660,18 +660,30 @@
 			// Search Box Input
 			const searchInput = document.getElementById('search-input');
 			let debounceTimeout;
+
+			const triggerSearch = () => {
+				clearTimeout(debounceTimeout);
+				const val = searchInput.value.trim();
+				if (currentSearch !== val) {
+					currentSearch = val;
+					loadRanking();
+				}
+			};
+
 			searchInput.addEventListener('input', () => {
 				clearTimeout(debounceTimeout);
-				debounceTimeout = setTimeout(() => {
-					currentSearch = searchInput.value;
-					loadRanking();
-				}, 300);
+				debounceTimeout = setTimeout(triggerSearch, 1000);
+			});
+
+			searchInput.addEventListener('keydown', (e) => {
+				if (e.key === 'Enter') {
+					triggerSearch();
+				}
 			});
 
 			// Search Button Click
 			document.getElementById('search-btn').addEventListener('click', () => {
-				currentSearch = searchInput.value;
-				loadRanking();
+				triggerSearch();
 			});
 		});
 	</script>

@@ -20,8 +20,9 @@ export default {
 			// Check if post is from a new topic
 			// const isNewTopic = await bot.isTopic(cmmId, topicId, postId)
 
-			// Check if member is banned from using the bot
-			if (banned.includes(userId)) return res.status(200).send('ok')
+			// Check if member is banned from using the bot, is the bot itself, or is a group/community post
+			const botId = parseInt(process.env.BOT_ID || process.env.VK_BOT_ID || '0')
+			if (banned.includes(userId) || userId <= 0 || userId === botId) return res.status(200).send('ok')
 
 			// Send 'ok' immediately to VK to prevent duplicate callback delivery due to timeout retries
 			res.status(200).send('ok')

@@ -92,7 +92,7 @@ app.get('/api/ranking', async (request, response) => {
 			return response.json(cached.data)
 		}
 
-		const botId = parseInt(process.env.BOT_ID || '0')
+		const botId = parseInt(process.env.BOT_ID || process.env.VK_BOT_ID || '0')
 
 		// Calculate current week number
 		const initialDate = process.env.INITIAL_DATE ? new Date(process.env.INITIAL_DATE) : new Date()

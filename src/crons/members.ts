@@ -32,7 +32,7 @@ export default {
 						const bPosts = b.posts.slice(-1)[0] || 0
 						return bPosts - aPosts
 					})
-					.filter((member) => member.userId !== parseInt(process.env.BOT_ID || '0'))
+					.filter((member) => member.userId !== parseInt(process.env.BOT_ID || process.env.VK_BOT_ID || '0'))
 
 				const membersWithMostPosts = membersSortedByLastWeekPosts.slice(0, numberOfMembers)
 				if (membersWithMostPosts.length === 0) continue

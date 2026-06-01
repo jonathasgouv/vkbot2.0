@@ -808,7 +808,7 @@ ${badgesList}`
 			)
 
 			// 6. Filtrar comentários irrelevantes (comandos, bot, etc.)
-			const botId = parseInt(process.env.BOT_ID || '0')
+			const botId = parseInt(process.env.BOT_ID || process.env.VK_BOT_ID || '0')
 			const filteredComments = uniqueComments.filter((c) => {
 				const isBot = c.from_id === botId || c.from_id === -botId || c.from_id === -cmmId
 				const isCommand = c.text?.trim().startsWith('!')
@@ -858,7 +858,7 @@ ${formattedMessages}
 Resumo:`
 
 			const geminiResponse = await axios.post(
-				`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+				`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
 				{
 					contents: [{ parts: [{ text: prompt }] }]
 				}
@@ -970,7 +970,7 @@ Resumo:`
 		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
 
 		try {
-			const botId = parseInt(process.env.BOT_ID || '0')
+			const botId = parseInt(process.env.BOT_ID || process.env.VK_BOT_ID || '0')
 			const betsAggregation = await Bet.aggregate([
 				{ $match: { cmmId, processed: true, userId: { $ne: botId } } },
 				{ $group: { _id: '$userId', totalPoints: { $sum: '$points' } } },
@@ -1011,7 +1011,7 @@ Resumo:`
 		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
 
 		try {
-			const botId = parseInt(process.env.BOT_ID || '0')
+			const botId = parseInt(process.env.BOT_ID || process.env.VK_BOT_ID || '0')
 			const members = await Member.aggregate([
 				{ $match: { cmmId, userId: { $ne: botId } } },
 				{ $addFields: { totalPosts: {
@@ -1262,7 +1262,7 @@ Resumo:`
 
 	async scanKeywords(cmmId: number, topicId: number, authorId: number, postId: number, text: string): Promise<void> {
 		try {
-			const botId = parseInt(process.env.BOT_ID || '0')
+			const botId = parseInt(process.env.BOT_ID || process.env.VK_BOT_ID || '0')
 			if (authorId === botId || authorId === -botId || authorId === -cmmId) return
 			if (text?.trim().startsWith('!')) return
 			if (!text?.trim()) return

@@ -96,6 +96,12 @@ import bot from '@utils/bot'
 describe('Bolao tests', () => {
 	beforeEach(() => {
 		jest.clearAllMocks()
+		mockFindOneRound.mockImplementation(() => {
+			return {
+				sort: jest.fn().mockReturnThis(),
+				then: jest.fn((resolve) => resolve(null)),
+			}
+		})
 	})
 
 	describe('checkAndCreateNextRound cron', () => {
@@ -129,6 +135,10 @@ describe('Bolao tests', () => {
 			// Round 18 already exists check returns null (not found)
 			mockFindRoundById.mockResolvedValue(null)
 
+			const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
+			const pad = (num: number) => String(num).padStart(2, '0')
+			const tomorrowStr = `${pad(tomorrow.getDate())}/${pad(tomorrow.getMonth() + 1)}/${tomorrow.getFullYear()}`
+
 			// Round API response mock
 			mockGetGamesByRound.mockResolvedValue({
 				jogos: [
@@ -140,7 +150,7 @@ describe('Bolao tests', () => {
 								rodada: '18',
 								mandante: { nome: 'Flamengo', gols: null },
 								visitante: { nome: 'Coritiba', gols: null },
-								data: '15/06/2026',
+								data: tomorrowStr,
 								hora: '21:00',
 							}
 						]
@@ -154,7 +164,7 @@ describe('Bolao tests', () => {
 				expect.objectContaining({
 					cmmId: 100,
 					title: expect.stringContaining('Rodada 18'),
-					text: expect.stringContaining('1. Flamengo x Coritiba'),
+					text: expect.stringContaining(`1. Flamengo x Coritiba (${tomorrowStr} 21:00)`),
 				})
 			)
 			expect(mockCreateRound).toHaveBeenCalledWith(
@@ -190,7 +200,12 @@ describe('Bolao tests', () => {
 					}
 				]
 			}
-			mockFindOneRound.mockResolvedValue(mockRound)
+			mockFindOneRound.mockImplementation(() => {
+				return {
+					sort: jest.fn().mockReturnThis(),
+					then: jest.fn((resolve) => resolve(mockRound)),
+				}
+			})
 			jest.spyOn(bot, 'getQuoteString').mockResolvedValue('[post400|John],')
 
 			// Message contains guesses for game 1 and 2

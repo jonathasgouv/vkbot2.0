@@ -21,31 +21,45 @@ export default {
 
 			if (cmms.length === 0) return
 
-			// Fetch today's calendar matches to detect current active round
-			const calendarGames = await cbfApi.getGames()
-			const brasileiroGames = calendarGames.jogos?.['Campeonato Brasileiro']
-			const serieAGames = brasileiroGames?.['Série A'] || []
-
-			if (serieAGames.length === 0) {
-				console.info('No Serie A games today in calendar to detect round')
-				return
-			}
-
-			const roundNumber = parseInt(serieAGames[0].rodada)
-			if (!roundNumber) return
-
 			for (const cmmId of cmms) {
-				const roundId = `${cmmId}_${championshipId}_${roundNumber}`
+				// Find the last round created in the database for this community and championship
+				const lastRound = await BolaoRound.findOne({ cmmId, championshipId }).sort({ roundNumber: -1 })
+				
+				let nextRoundNumber = 1
+				
+				if (lastRound) {
+					nextRoundNumber = lastRound.roundNumber + 1
+				} else {
+					// Bootstrap: If no rounds exist yet, detect from today's calendar
+					const calendarGames = await cbfApi.getGames()
+					const brasileiroGames = calendarGames.jogos?.['Campeonato Brasileiro']
+					const serieAGames = brasileiroGames?.['Série A'] || []
+					
+					if (serieAGames.length > 0) {
+						const activeRound = parseInt(serieAGames[0].rodada)
+						if (activeRound) {
+							nextRoundNumber = activeRound
+						}
+					} else {
+						console.info(`No active round found today to bootstrap community ${cmmId}. Waiting for game day.`)
+						continue
+					}
+				}
+
+				if (nextRoundNumber > 38) {
+					console.info(`Championship ended (round ${nextRoundNumber - 1} was the last one). Skipping creation.`)
+					continue
+				}
+
+				const roundId = `${cmmId}_${championshipId}_${nextRoundNumber}`
 				const existingRound = await BolaoRound.findById(roundId)
 
 				if (existingRound) {
 					continue
 				}
 
-				console.info(`Creating new Bolao topic for round ${roundNumber} in community ${cmmId}`)
-
 				// Fetch all games of the round
-				const roundData = await cbfApi.getGamesByRound(championshipId, roundNumber)
+				const roundData = await cbfApi.getGamesByRound(championshipId, nextRoundNumber)
 				const allGames: IBolaoGame[] = []
 
 				if (roundData?.jogos) {
@@ -57,7 +71,7 @@ export default {
 									homeTeam: game.mandante.nome,
 									awayTeam: game.visitante.nome,
 									date: game.data.trim(),
-									time: game.hora.trim(),
+									time: game.hora ? game.hora.trim() : '16:00',
 								})
 							}
 						}
@@ -65,13 +79,46 @@ export default {
 				}
 
 				if (allGames.length === 0) {
-					console.warn(`No games found for round ${roundNumber} on CBF API`)
+					console.warn(`No games found for round ${nextRoundNumber} on CBF API`)
 					continue
 				}
 
+				// Check if the round should be created (within 4 days of the earliest game)
+				let earliestGameTime = Infinity
+				const parseGameDateTime = (dStr: string, tStr: string): Date => {
+					const [day, month, year] = dStr.trim().split('/').map(Number)
+					let hour = 16
+					let minute = 0
+					if (tStr && tStr.includes(':')) {
+						const parts = tStr.trim().split(':').map(Number)
+						if (!isNaN(parts[0])) hour = parts[0]
+						if (!isNaN(parts[1])) minute = parts[1]
+					}
+					const pad = (num: number) => String(num).padStart(2, '0')
+					return new Date(`${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}:00-03:00`)
+				}
+
+				for (const game of allGames) {
+					const gTime = parseGameDateTime(game.date, game.time).getTime()
+					if (gTime < earliestGameTime) {
+						earliestGameTime = gTime
+					}
+				}
+
+				const timeUntilFirstGame = earliestGameTime - Date.now()
+				const fourDaysInMs = 4 * 24 * 60 * 60 * 1000
+
+				// Create the round if it's within 4 days of starting
+				if (timeUntilFirstGame > fourDaysInMs) {
+					console.info(`Round ${nextRoundNumber} is still too far in the future (${Math.round(timeUntilFirstGame / (24*60*60*1000))} days left). Skipping creation.`)
+					continue
+				}
+
+				console.info(`Creating new Bolao topic for round ${nextRoundNumber} in community ${cmmId}`)
+
 				// Format the topic title and description
-				const title = `⚽ [BOLÃO] Campeonato Brasileiro - Série A - Rodada ${roundNumber} ⚽`
-				let text = `Olá, pessoal! Bem-vindos ao Bolão da Rodada ${roundNumber}! 🏆\n\nEscreva seus palpites respondendo a este tópico no formato exato:\n[Número do Jogo]. GolsMandante x GolsVisitante\n\nJogos da Rodada ${roundNumber}:\n`
+				const title = `⚽ [BOLÃO] Campeonato Brasileiro - Série A - Rodada ${nextRoundNumber} ⚽`
+				let text = `Olá, pessoal! Bem-vindos ao Bolão da Rodada ${nextRoundNumber}! 🏆\n\nEscreva seus palpites respondendo a este tópico no formato exato:\n[Número do Jogo]. GolsMandante x GolsVisitante\n\nJogos da Rodada ${nextRoundNumber}:\n`
 
 				allGames.forEach((game, idx) => {
 					text += `${idx + 1}. ${game.homeTeam} x ${game.awayTeam} (${game.date} ${game.time})\n`
@@ -92,7 +139,7 @@ export default {
 					cmmId,
 					championshipId,
 					championshipName: 'Campeonato Brasileiro',
-					roundNumber,
+					roundNumber: nextRoundNumber,
 					topicId,
 					games: allGames,
 					processed: false,

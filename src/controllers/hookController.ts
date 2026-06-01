@@ -32,6 +32,9 @@ export default {
 					// Updates member posts number on db
 					await bot.updateMemberPosts(cmmId, userId, topicId, postId)
 
+					// Scan keywords in the comment
+					await bot.scanKeywords(cmmId, topicId, userId, postId, message)
+
 					// Check if it's a comment in an active Bolao topic
 					const isBolao = await bot.isBolaoTopic(cmmId, topicId)
 					if (isBolao) {

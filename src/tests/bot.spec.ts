@@ -103,6 +103,24 @@ jest.mock('@models/Bet', () => {
 	}
 })
 
+const mockFindOneKeyword = jest.fn()
+const mockUpdateOneKeyword = jest.fn()
+const mockDeleteOneKeyword = jest.fn()
+const mockCountDocumentsKeyword = jest.fn()
+const mockFindKeyword = jest.fn()
+jest.mock('@models/Keyword', () => {
+	return {
+		__esModule: true,
+		default: {
+			findOne: mockFindOneKeyword,
+			updateOne: mockUpdateOneKeyword,
+			deleteOne: mockDeleteOneKeyword,
+			countDocuments: mockCountDocumentsKeyword,
+			find: mockFindKeyword,
+		}
+	}
+})
+
 import bot from '@utils/bot'
 
 describe('bot.ts utility functions', () => {
@@ -597,6 +615,301 @@ describe('bot.ts utility functions', () => {
 					text: expect.stringContaining('Resumo mockado de IA.'),
 				})
 			)
+		})
+	})
+
+	describe('Keyword Monitoring Feature', () => {
+		beforeEach(() => {
+			jest.clearAllMocks()
+		})
+
+		describe('monitorarKeyword (!monitorar)', () => {
+			test('should successfully register a partial matching keyword when DM test succeeds', async () => {
+				mockCountDocumentsKeyword.mockResolvedValue(0)
+				mockSend.mockResolvedValue(12345) // Test DM succeeds
+				mockUpdateOneKeyword.mockResolvedValue({ acknowledged: true })
+
+				await bot.execCommand('monitorar', 300, 200, 400, 100, '!monitorar ingresso')
+
+				expect(mockCountDocumentsKeyword).toHaveBeenCalledWith({ userId: 300, cmmId: 100 })
+				expect(mockSend).toHaveBeenCalledWith({
+					peerId: 300,
+					message: expect.stringContaining('ingresso')
+				})
+				expect(mockUpdateOneKeyword).toHaveBeenCalledWith(
+					{ userId: 300, cmmId: 100, keyword: expect.any(RegExp) },
+					{
+						userId: 300,
+						cmmId: 100,
+						keyword: 'ingresso',
+						isExact: false,
+						createdAt: expect.any(Date)
+					},
+					{ upsert: true }
+				)
+				expect(mockCreateComment).toHaveBeenCalledWith({
+					cmmId: 100,
+					topicId: 200,
+					text: expect.stringContaining('✅ Monitoramento da palavra-chave "ingresso" (Parcial) ativado com sucesso!'),
+				})
+			})
+
+			test('should register an exact matching keyword with -e parameter', async () => {
+				mockCountDocumentsKeyword.mockResolvedValue(0)
+				mockSend.mockResolvedValue(12345)
+				mockUpdateOneKeyword.mockResolvedValue({ acknowledged: true })
+
+				await bot.execCommand('monitorar', 300, 200, 400, 100, '!monitorar -e gol')
+
+				expect(mockUpdateOneKeyword).toHaveBeenCalledWith(
+					{ userId: 300, cmmId: 100, keyword: expect.any(RegExp) },
+					{
+						userId: 300,
+						cmmId: 100,
+						keyword: 'gol',
+						isExact: true,
+						createdAt: expect.any(Date)
+					},
+					{ upsert: true }
+				)
+				expect(mockCreateComment).toHaveBeenCalledWith({
+					cmmId: 100,
+					topicId: 200,
+					text: expect.stringContaining('✅ Monitoramento da palavra-chave "gol" (Exata) ativado com sucesso!'),
+				})
+			})
+
+			test('should redirect to desmonitorar if -d parameter is provided', async () => {
+				mockDeleteOneKeyword.mockResolvedValue({ deletedCount: 1 })
+
+				await bot.execCommand('monitorar', 300, 200, 400, 100, '!monitorar -d ingresso')
+
+				expect(mockDeleteOneKeyword).toHaveBeenCalledWith({
+					userId: 300,
+					cmmId: 100,
+					keyword: expect.any(RegExp)
+				})
+				expect(mockCreateComment).toHaveBeenCalledWith({
+					cmmId: 100,
+					topicId: 200,
+					text: expect.stringContaining('❌ Monitoramento da palavra-chave "ingresso" removido.'),
+				})
+			})
+
+			test('should show warning if no keyword is provided', async () => {
+				await bot.execCommand('monitorar', 300, 200, 400, 100, '!monitorar')
+				expect(mockCreateComment).toHaveBeenCalledWith({
+					cmmId: 100,
+					topicId: 200,
+					text: expect.stringContaining('⚠️ Por favor, insira um termo para monitorar.'),
+				})
+			})
+
+			test('should enforce the limit of 5 keywords per user', async () => {
+				mockCountDocumentsKeyword.mockResolvedValue(5)
+
+				await bot.execCommand('monitorar', 300, 200, 400, 100, '!monitorar ingresso')
+
+				expect(mockSend).not.toHaveBeenCalled()
+				expect(mockUpdateOneKeyword).not.toHaveBeenCalled()
+				expect(mockCreateComment).toHaveBeenCalledWith({
+					cmmId: 100,
+					topicId: 200,
+					text: expect.stringContaining('⚠️ Limite de 5 palavras-chave atingido.'),
+				})
+			})
+
+			test('should display instructions and abort if test DM fails', async () => {
+				mockCountDocumentsKeyword.mockResolvedValue(0)
+				mockSend.mockRejectedValue(new Error('VK Error 901: can\'t send messages for users without permission'))
+
+				await bot.execCommand('monitorar', 300, 200, 400, 100, '!monitorar ingresso')
+
+				expect(mockUpdateOneKeyword).not.toHaveBeenCalled()
+				expect(mockCreateComment).toHaveBeenCalledWith({
+					cmmId: 100,
+					topicId: 200,
+					text: expect.stringContaining('⚠️ Não consegui te enviar uma mensagem privada.\nPara receber alertas de monitoramento, você precisa abrir um chat com o bot'),
+				})
+			})
+		})
+
+		describe('desmonitorarKeyword (!desmonitorar)', () => {
+			test('should successfully delete an existing keyword', async () => {
+				mockDeleteOneKeyword.mockResolvedValue({ deletedCount: 1 })
+
+				await bot.execCommand('desmonitorar', 300, 200, 400, 100, '!desmonitorar ingresso')
+
+				expect(mockDeleteOneKeyword).toHaveBeenCalledWith({
+					userId: 300,
+					cmmId: 100,
+					keyword: expect.any(RegExp)
+				})
+				expect(mockCreateComment).toHaveBeenCalledWith({
+					cmmId: 100,
+					topicId: 200,
+					text: expect.stringContaining('❌ Monitoramento da palavra-chave "ingresso" removido.'),
+				})
+			})
+
+			test('should show warning if keyword is not found in database', async () => {
+				mockDeleteOneKeyword.mockResolvedValue({ deletedCount: 0 })
+
+				await bot.execCommand('desmonitorar', 300, 200, 400, 100, '!desmonitorar inexistente')
+
+				expect(mockCreateComment).toHaveBeenCalledWith({
+					cmmId: 100,
+					topicId: 200,
+					text: expect.stringContaining('⚠️ Você não está monitorando a palavra-chave "inexistente".'),
+				})
+			})
+
+			test('should show warning if no keyword parameter is given', async () => {
+				await bot.execCommand('desmonitorar', 300, 200, 400, 100, '!desmonitorar')
+				expect(mockCreateComment).toHaveBeenCalledWith({
+					cmmId: 100,
+					topicId: 200,
+					text: expect.stringContaining('⚠️ Por favor, insira o termo que deseja desmonitorar.'),
+				})
+			})
+		})
+
+		describe('listarKeywords (!monitorados)', () => {
+			test('should list all registered keywords with match type', async () => {
+				mockFindKeyword.mockReturnValue({
+					sort: jest.fn().mockResolvedValue([
+						{ keyword: 'ingresso', isExact: false, createdAt: new Date() },
+						{ keyword: 'gol', isExact: true, createdAt: new Date() }
+					])
+				})
+
+				await bot.execCommand('monitorados', 300, 200, 400, 100, '!monitorados')
+
+				expect(mockFindKeyword).toHaveBeenCalledWith({ userId: 300, cmmId: 100 })
+				expect(mockCreateComment).toHaveBeenCalledWith({
+					cmmId: 100,
+					topicId: 200,
+					text: expect.stringContaining('Suas palavras-chave monitoradas nesta comunidade:\n\n1. "ingresso" (Parcial)\n2. "gol" (Exata)'),
+				})
+			})
+
+			test('should inform if no keywords are registered', async () => {
+				mockFindKeyword.mockReturnValue({
+					sort: jest.fn().mockResolvedValue([])
+				})
+
+				await bot.execCommand('monitorados', 300, 200, 400, 100, '!monitorados')
+
+				expect(mockCreateComment).toHaveBeenCalledWith({
+					cmmId: 100,
+					topicId: 200,
+					text: expect.stringContaining('Você não tem nenhuma palavra-chave cadastrada para monitoramento nesta comunidade.'),
+				})
+			})
+		})
+
+		describe('scanKeywords logic', () => {
+			beforeEach(() => {
+				// Mock getTopicTitle helper
+				jest.spyOn(bot, 'getTopicTitle').mockResolvedValue('Tópico Geral de Discussão')
+			})
+
+			test('should successfully trigger DM for substring/partial match', async () => {
+				mockFindKeyword.mockResolvedValue([
+					{ userId: 500, keyword: 'ingresso', isExact: false }
+				])
+
+				await bot.scanKeywords(100, 200, 300, 401, 'Comprei meu ingresso hoje na bilheteria')
+
+				// Must fetch keywords excluding the author's own keywords
+				expect(mockFindKeyword).toHaveBeenCalledWith({ cmmId: 100, userId: { $ne: 300 } })
+				expect(mockSend).toHaveBeenCalledWith({
+					peerId: 500,
+					message: expect.stringContaining('A palavra "ingresso" foi mencionada no tópico:\n👉 "Tópico Geral de Discussão"')
+				})
+				expect(mockSend).toHaveBeenCalledWith({
+					peerId: 500,
+					message: expect.stringContaining('Comentário: "Comprei meu ingresso hoje na bilheteria"')
+				})
+			})
+
+			test('should trigger DM for exact boundary matches', async () => {
+				mockFindKeyword.mockResolvedValue([
+					{ userId: 500, keyword: 'gol', isExact: true }
+				])
+
+				// Match at start of sentence, followed by space
+				await bot.scanKeywords(100, 200, 300, 401, 'gol foi bonito!')
+				expect(mockSend).toHaveBeenCalledTimes(1)
+
+				// Match inside sentence with Portuguese accents boundaries
+				mockSend.mockClear()
+				await bot.scanKeywords(100, 200, 300, 401, 'Que golaço! Não, pera, foi apenas um gol.')
+				expect(mockSend).toHaveBeenCalledTimes(1)
+			})
+
+			test('should NOT trigger DM for exact matches that are inside another word', async () => {
+				mockFindKeyword.mockResolvedValue([
+					{ userId: 500, keyword: 'gol', isExact: true }
+				])
+
+				await bot.scanKeywords(100, 200, 300, 401, 'Aquele goleador é muito bom')
+				expect(mockSend).not.toHaveBeenCalled()
+			})
+
+			test('should escape special regex characters in user keywords during scan', async () => {
+				mockFindKeyword.mockResolvedValue([
+					{ userId: 500, keyword: 'ingressos?', isExact: true }
+				])
+
+				// Should not match without the question mark
+				await bot.scanKeywords(100, 200, 300, 401, 'Quem tem ingressos')
+				expect(mockSend).not.toHaveBeenCalled()
+
+				// Should match literal question mark
+				mockSend.mockClear()
+				await bot.scanKeywords(100, 200, 300, 401, 'Quem tem ingressos? sim')
+				expect(mockSend).toHaveBeenCalled()
+			})
+
+			test('should bypass scan if author is the bot or it is a command', async () => {
+				mockFindKeyword.mockResolvedValue([
+					{ userId: 500, keyword: 'ingresso', isExact: false }
+				])
+
+				// Author is the bot
+				process.env.BOT_ID = '9999'
+				await bot.scanKeywords(100, 200, 9999, 401, 'Comprei meu ingresso')
+				expect(mockSend).not.toHaveBeenCalled()
+
+				// Comment starts with command
+				mockSend.mockClear()
+				await bot.scanKeywords(100, 200, 300, 401, '!citar ingresso comprado')
+				expect(mockSend).not.toHaveBeenCalled()
+			})
+
+			test('should not notify the author of the comment (avoid self-notification)', async () => {
+				mockFindKeyword.mockResolvedValue([
+					{ userId: 300, keyword: 'ingresso', isExact: false }
+				])
+
+				// Author is 300, matching keyword's user is also 300
+				await bot.scanKeywords(100, 200, 300, 401, 'Comprei meu ingresso')
+				expect(mockSend).not.toHaveBeenCalled()
+			})
+
+			test('should notify a user only once per comment even if multiple keywords match', async () => {
+				mockFindKeyword.mockResolvedValue([
+					{ userId: 500, keyword: 'ingresso', isExact: false },
+					{ userId: 500, keyword: 'comprar', isExact: false }
+				])
+
+				// Matches both "ingresso" and "comprar"
+				await bot.scanKeywords(100, 200, 300, 401, 'Vou comprar meu ingresso hoje')
+
+				// Should only send 1 message to peerId 500
+				expect(mockSend).toHaveBeenCalledTimes(1)
+			})
 		})
 	})
 })

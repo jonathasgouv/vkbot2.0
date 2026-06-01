@@ -7,6 +7,7 @@ import Member from '@models/Member'
 import Topic from '@models/Topic'
 import BolaoRound from '@models/BolaoRound'
 import Bet from '@models/Bet'
+import Keyword from '@models/Keyword'
 import axios from 'axios'
 import type ICommandsInput from '@appTypes/bot'
 import type ITopic from '@appTypes/topic'
@@ -256,6 +257,9 @@ export default {
 			wiki: this.searchWiki,
 			vs: this.sendComparison,
 			resumo: this.sendTopicSummary,
+			monitorar: this.monitorarKeyword,
+			desmonitorar: this.desmonitorarKeyword,
+			monitorados: this.listarKeywords,
 		}
 
 		// Shorthand versions of commands
@@ -274,6 +278,9 @@ export default {
 			rkpf: 'rankingrpg',
 			w: 'wiki',
 			rs: 'resumo',
+			mon: 'monitorar',
+			dmon: 'desmonitorar',
+			mons: 'monitorados',
 		}
 
 		// If it is a shorthand transpiles it to complete version
@@ -1112,6 +1119,207 @@ Resumo:`
 				: await vkApi.board.createComment({ topicId, cmmId, text: responseText })
 		} catch (error) {
 			console.error(`Erro no comando de busca da Wikipédia para "${query}":`, error)
+		}
+	},
+
+	async monitorarKeyword(data: ICommandsInput): Promise<void> {
+		const { topicId, cmmId, postId, userId, message } = data
+		const params = this.getCommandParameters(message)
+		const isExact = params?.includes('e')
+		const isDelete = params?.includes('d')
+
+		// If -d flag is present, redirect to desmonitorar
+		if (isDelete) {
+			return this.desmonitorarKeyword(data)
+		}
+
+		const quote = await this.getQuoteString(postId, userId)
+		
+		// Extract raw keyword by removing command (!monitorar or !mon) and options (-e, -d, etc.)
+		const keyword = message
+			.replaceAll(/!(monitorar|mon)/gm, '')
+			.replaceAll(/-[a-z]/gm, '')
+			.trim()
+
+		if (!keyword) {
+			const text = `${quote} ⚠️ Por favor, insira um termo para monitorar. Exemplo: !monitorar ingresso`
+			await vkApi.board.createComment({ topicId, cmmId, text })
+			return
+		}
+
+		try {
+			// Check limit of 5 keywords per user in this community
+			const count = await Keyword.countDocuments({ userId, cmmId })
+			if (count >= 5) {
+				const text = `${quote} ⚠️ Limite de 5 palavras-chave atingido. Use !monitorados para listar e !desmonitorar <termo> para remover alguma.`
+				await vkApi.board.createComment({ topicId, cmmId, text })
+				return
+			}
+
+			// Validate if bot can send a private message to this user
+			try {
+				await vkApi.messages.send({
+					peerId: userId,
+					message: `🔔 Olá! Este é um teste para confirmar que seu monitoramento da palavra-chave "${keyword}" foi ativado com sucesso nesta comunidade.`
+				})
+			} catch (dmError) {
+				// VK API throws when user hasn't allowed messages
+				console.info(`Falha ao testar DM para usuário ${userId}:`, dmError)
+				const text = `${quote} ⚠️ Não consegui te enviar uma mensagem privada.\nPara receber alertas de monitoramento, você precisa abrir um chat com o bot (iniciar conversa/enviar mensagem) e tentar registrar o termo novamente.`
+				await vkApi.board.createComment({ topicId, cmmId, text })
+				return
+			}
+
+			// Register / Update keyword in database
+			await Keyword.updateOne(
+				{ userId, cmmId, keyword: new RegExp('^' + this.escapeRegExp(keyword) + '$', 'i') },
+				{
+					userId,
+					cmmId,
+					keyword,
+					isExact: !!isExact,
+					createdAt: new Date()
+				},
+				{ upsert: true }
+			)
+
+			const mode = isExact ? 'Exata' : 'Parcial'
+			const text = `${quote} ✅ Monitoramento da palavra-chave "${keyword}" (${mode}) ativado com sucesso! Você receberá alertas no privado.`
+			await vkApi.board.createComment({ topicId, cmmId, text })
+		} catch (error) {
+			console.error('Erro no comando monitorar:', error)
+			const text = `${quote} ❌ Ocorreu um erro ao tentar salvar o monitoramento.`
+			await vkApi.board.createComment({ topicId, cmmId, text })
+		}
+	},
+
+	async desmonitorarKeyword(data: ICommandsInput): Promise<void> {
+		const { topicId, cmmId, postId, userId, message } = data
+		const quote = await this.getQuoteString(postId, userId)
+		
+		const keyword = message
+			.replaceAll(/!(desmonitorar|dmon|monitorar|mon)/gm, '')
+			.replaceAll(/-[a-z]/gm, '')
+			.trim()
+
+		if (!keyword) {
+			const text = `${quote} ⚠️ Por favor, insira o termo que deseja desmonitorar. Exemplo: !desmonitorar ingresso`
+			await vkApi.board.createComment({ topicId, cmmId, text })
+			return
+		}
+
+		try {
+			const result = await Keyword.deleteOne({
+				userId,
+				cmmId,
+				keyword: new RegExp('^' + this.escapeRegExp(keyword) + '$', 'i')
+			})
+
+			if (result.deletedCount === 0) {
+				const text = `${quote} ⚠️ Você não está monitorando a palavra-chave "${keyword}".`
+				await vkApi.board.createComment({ topicId, cmmId, text })
+			} else {
+				const text = `${quote} ❌ Monitoramento da palavra-chave "${keyword}" removido.`
+				await vkApi.board.createComment({ topicId, cmmId, text })
+			}
+		} catch (error) {
+			console.error('Erro no comando desmonitorar:', error)
+			const text = `${quote} ❌ Ocorreu um erro ao tentar remover o monitoramento.`
+			await vkApi.board.createComment({ topicId, cmmId, text })
+		}
+	},
+
+	async listarKeywords(data: ICommandsInput): Promise<void> {
+		const { topicId, cmmId, postId, userId } = data
+		const quote = await this.getQuoteString(postId, userId)
+
+		try {
+			const userKeywords = await Keyword.find({ userId, cmmId }).sort({ createdAt: 1 })
+
+			if (userKeywords.length === 0) {
+				const text = `${quote} Você não tem nenhuma palavra-chave cadastrada para monitoramento nesta comunidade.`
+				await vkApi.board.createComment({ topicId, cmmId, text })
+				return
+			}
+
+			const lines = userKeywords.map((kw, idx) => {
+				const type = kw.isExact ? 'Exata' : 'Parcial'
+				return `${idx + 1}. "${kw.keyword}" (${type})`
+			})
+
+			const text = `${quote} Suas palavras-chave monitoradas nesta comunidade:\n\n${lines.join('\n')}\n\nUse !desmonitorar <termo> para remover.`
+			await vkApi.board.createComment({ topicId, cmmId, text })
+		} catch (error) {
+			console.error('Erro ao listar palavras-chave:', error)
+			const text = `${quote} ❌ Ocorreu um erro ao tentar buscar suas palavras-chave.`
+			await vkApi.board.createComment({ topicId, cmmId, text })
+		}
+	},
+
+	escapeRegExp(string: string): string {
+		return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+	},
+
+	async scanKeywords(cmmId: number, topicId: number, authorId: number, postId: number, text: string): Promise<void> {
+		try {
+			const botId = parseInt(process.env.BOT_ID || '0')
+			if (authorId === botId || authorId === -botId || authorId === -cmmId) return
+			if (text?.trim().startsWith('!')) return
+			if (!text?.trim()) return
+
+			// 1. Fetch all keywords for this cmmId, excluding the author's own keywords
+			const keywords = await Keyword.find({ cmmId, userId: { $ne: authorId } })
+			if (keywords.length === 0) return
+
+			// 2. Resolve topic title
+			const topicTitle = await this.getTopicTitle(cmmId, topicId)
+
+			// 3. Keep track of users we want to notify and the keyword that matched
+			// Use a map to notify each user only once per comment, even if multiple keywords match
+			const notifications = new Map<number, string>()
+
+			for (const kw of keywords) {
+				if (kw.userId === authorId) continue
+				if (notifications.has(kw.userId)) continue
+
+				let isMatch = false
+				if (kw.isExact) {
+					// Word boundary match that respects Portuguese characters (accents)
+					const regex = new RegExp(`(?<=^|[^a-zA-Z0-9áéíóúâêôçãõàüí])` + this.escapeRegExp(kw.keyword) + `(?=$|[^a-zA-Z0-9áéíóúâêôçãõàüí])`, 'i')
+					isMatch = regex.test(text)
+				} else {
+					isMatch = text.toLowerCase().includes(kw.keyword.toLowerCase())
+				}
+
+				if (isMatch) {
+					notifications.set(kw.userId, kw.keyword)
+				}
+			}
+
+			// 4. Send VK DM to matching users concurrently
+			if (notifications.size > 0) {
+				const promises = Array.from(notifications.entries()).map(async ([userId, kw]) => {
+					try {
+						// Clean preview comment to avoid huge DMs
+						const commentSnippet = text.length > 200 ? text.substring(0, 200) + '...' : text
+						const notificationMsg = `🔔 *Alerta de Palavra-chave* 🔔
+A palavra "${kw}" foi mencionada no tópico:
+👉 "${topicTitle}"
+
+Comentário: "${commentSnippet}"
+Link: https://vk.com/topic-${cmmId}_${topicId}?post=${postId}`
+
+						await vkApi.messages.send({ peerId: userId, message: notificationMsg })
+					} catch (err) {
+						// Log error but keep processing others
+						console.error(`Erro ao notificar usuário ${userId} para keyword "${kw}":`, err)
+					}
+				})
+
+				await Promise.all(promises)
+			}
+		} catch (error) {
+			console.error('Erro ao escanear palavras-chave:', error)
 		}
 	},
 }

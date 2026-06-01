@@ -56,6 +56,15 @@ interface ICacheEntry {
 const rankingCache = new Map<string, ICacheEntry>()
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
+interface IVkUserCache {
+	first_name: string
+	last_name: string
+	photo_100?: string
+	timestamp: number
+}
+const vkUserCache = new Map<number, IVkUserCache>()
+const VK_USER_CACHE_TTL = 30 * 60 * 1000 // 30 minutes
+
 app.get('/api/ranking', async (request, response) => {
 	try {
 		let cmmId: number
@@ -73,7 +82,9 @@ app.get('/api/ranking', async (request, response) => {
 			cmmId = cmmCounts[0]._id
 		}
 
-		const cacheKey = `cmm_${cmmId}`
+		const period = (request.query.period as string) || 'overall'
+		const searchQuery = (request.query.search as string || '').trim().toLowerCase()
+		const cacheKey = `cmm_${cmmId}_${period}_${searchQuery}`
 		const cached = rankingCache.get(cacheKey)
 		const now = Date.now()
 
@@ -83,57 +94,116 @@ app.get('/api/ranking', async (request, response) => {
 
 		const botId = parseInt(process.env.BOT_ID || '0')
 
-		// 1. RPG ranking (Top 20)
-		const members = await Member.aggregate([
-			{ $match: { cmmId, userId: { $ne: botId } } },
-			{ $addFields: { totalPosts: {
+		// Calculate current week number
+		const initialDate = process.env.INITIAL_DATE ? new Date(process.env.INITIAL_DATE) : new Date()
+		const weekNumber = generalFncs.weeksBetween(initialDate, new Date())
+
+		// Dynamic RPG post sum expression
+		let postsExpression: any
+		if (period === 'week') {
+			postsExpression = {
+				$ifNull: [{ $arrayElemAt: ['$posts', weekNumber] }, 0]
+			}
+		} else if (period === 'month') {
+			postsExpression = {
+				$reduce: {
+					input: { $slice: [{ $ifNull: ['$posts', []] }, Math.max(0, weekNumber - 3), 4] },
+					initialValue: 0,
+					in: { $add: ['$$value', { $ifNull: ['$$this', 0] }] }
+				}
+			}
+		} else if (period === 'year') {
+			postsExpression = {
+				$reduce: {
+					input: { $slice: [{ $ifNull: ['$posts', []] }, Math.max(0, weekNumber - 51), 52] },
+					initialValue: 0,
+					in: { $add: ['$$value', { $ifNull: ['$$this', 0] }] }
+				}
+			}
+		} else {
+			// 'overall' / default
+			postsExpression = {
 				$reduce: {
 					input: { $ifNull: ['$posts', []] },
 					initialValue: 0,
 					in: { $add: ['$$value', { $ifNull: ['$$this', 0] }] }
 				}
-			} } },
-			{ $sort: { totalPosts: -1 } },
-			{ $limit: 20 }
+			}
+		}
+
+		// RPG Ranking (Fetch all to assign absolute ranks)
+		const members = await Member.aggregate([
+			{ $match: { cmmId, userId: { $ne: botId } } },
+			{ $addFields: { totalPosts: postsExpression } },
+			{ $sort: { totalPosts: -1 } }
 		])
 
-		// 2. Bolão ranking (Top 20)
+		// Dynamic Bolão matches date matching query
+		const betsMatchQuery: any = { cmmId, processed: true, userId: { $ne: botId } }
+		if (period === 'week') {
+			betsMatchQuery.createdAt = { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+		} else if (period === 'month') {
+			betsMatchQuery.createdAt = { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
+		} else if (period === 'year') {
+			betsMatchQuery.createdAt = { $gte: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000) }
+		}
+
+		// Bolão Ranking (Fetch all to assign absolute ranks)
 		const bolao = await Bet.aggregate([
-			{ $match: { cmmId, processed: true, userId: { $ne: botId } } },
+			{ $match: betsMatchQuery },
 			{ $group: { _id: '$userId', totalPoints: { $sum: '$points' } } },
-			{ $sort: { totalPoints: -1 } },
-			{ $limit: 20 }
+			{ $sort: { totalPoints: -1 } }
 		])
 
-		// 3. Obter dados dos usuários do VK em lote
+		// Resolve VK profile details with memory caching
 		const allUserIds = Array.from(new Set([
 			...members.map(m => m.userId),
 			...bolao.map(b => b._id)
 		]))
 
-		let vkUsers: any[] = []
-		if (allUserIds.length > 0) {
-			vkUsers = await vkApi.users.get({
-				userIds: allUserIds,
-				fields: ['photo_100']
-			})
+		const missingUserIds = allUserIds.filter(id => {
+			const cachedUser = vkUserCache.get(id)
+			return !cachedUser || (now - cachedUser.timestamp > VK_USER_CACHE_TTL)
+		})
+
+		if (missingUserIds.length > 0) {
+			for (let i = 0; i < missingUserIds.length; i += 1000) {
+				const chunk = missingUserIds.slice(i, i + 1000)
+				try {
+					const fetched = await vkApi.users.get({
+						userIds: chunk,
+						fields: ['photo_100']
+					})
+					if (fetched) {
+						for (const u of fetched) {
+							vkUserCache.set(u.id, {
+								first_name: u.first_name,
+								last_name: u.last_name,
+								photo_100: u.photo_100,
+								timestamp: now
+							})
+						}
+					}
+				} catch (err) {
+					console.error('Error fetching missing VK users:', err)
+				}
+			}
 		}
 
-		// Map VK details to RPG ranking
-		const rpgRanking = members.map(m => {
-			const vkUser = vkUsers.find(u => u.id === m.userId)
-			const name = vkUser ? `${vkUser.first_name} ${vkUser.last_name}` : `Membro ${m.userId}`
-			const photo = vkUser?.photo_100 || 'https://vk.com/images/camera_100.png'
+		// Map RPG ranking and assign absolute ranks
+		const rpgRanking = members.map((m, index) => {
+			const cachedUser = vkUserCache.get(m.userId)
+			const name = cachedUser ? `${cachedUser.first_name} ${cachedUser.last_name}` : `Membro ${m.userId}`
+			const photo = cachedUser?.photo_100 || 'https://vk.com/images/camera_100.png'
 			const lvlInfo = generalFncs.getLevelInfo(m.totalPosts)
 			
 			// Calcular tempo de casa
-			const initialDate = process.env.INITIAL_DATE ? new Date(process.env.INITIAL_DATE) : new Date()
-			const firstActiveWeek = m.posts.findIndex((p: number) => (p || 0) > 0)
+			const firstActiveWeek = m.posts ? m.posts.findIndex((p: number) => (p || 0) > 0) : -1
 			let weeksOfHouse = 0
 			let monthsOfHouse = 0
 			if (firstActiveWeek !== -1) {
 				const joinDate = new Date(initialDate.getTime() + firstActiveWeek * 7 * 24 * 60 * 60 * 1000)
-				const diffTime = Math.abs(new Date().getTime() - joinDate.getTime())
+				const diffTime = Math.abs(now - joinDate.getTime())
 				weeksOfHouse = Math.floor(diffTime / (7 * 24 * 60 * 60 * 1000))
 				monthsOfHouse = Math.floor(weeksOfHouse / 4.34)
 			}
@@ -169,27 +239,46 @@ app.get('/api/ranking', async (request, response) => {
 				progressBar: lvlInfo.progressBar,
 				percentage: lvlInfo.percentage,
 				houseTime: `${monthsOfHouse} meses (${weeksOfHouse} semanas)`,
-				badges
+				badges,
+				rank: index + 1
 			}
 		})
 
-		// Map VK details to Bolão ranking
-		const bolaoRanking = bolao.map((b, idx) => {
-			const vkUser = vkUsers.find(u => u.id === b._id)
-			const name = vkUser ? `${vkUser.first_name} ${vkUser.last_name}` : `Membro ${b._id}`
-			const photo = vkUser?.photo_100 || 'https://vk.com/images/camera_100.png'
+		// Map Bolão ranking and assign absolute ranks
+		const bolaoRanking = bolao.map((b, index) => {
+			const cachedUser = vkUserCache.get(b._id)
+			const name = cachedUser ? `${cachedUser.first_name} ${cachedUser.last_name}` : `Membro ${b._id}`
+			const photo = cachedUser?.photo_100 || 'https://vk.com/images/camera_100.png'
 			return {
 				userId: b._id,
 				name,
 				photo,
 				points: b.totalPoints,
-				rank: idx + 1
+				rank: index + 1
 			}
 		})
 
+		// Filter by search query if present, otherwise slice to top 50
+		let filteredRpg = rpgRanking
+		let filteredBolao = bolaoRanking
+
+		if (searchQuery) {
+			filteredRpg = rpgRanking.filter(m => 
+				m.name.toLowerCase().includes(searchQuery) || 
+				String(m.userId) === searchQuery
+			)
+			filteredBolao = bolaoRanking.filter(b => 
+				b.name.toLowerCase().includes(searchQuery) || 
+				String(b.userId) === searchQuery
+			)
+		} else {
+			filteredRpg = rpgRanking.slice(0, 50)
+			filteredBolao = bolaoRanking.slice(0, 50)
+		}
+
 		const responseData = {
-			rpg: rpgRanking,
-			bolao: bolaoRanking,
+			rpg: filteredRpg,
+			bolao: filteredBolao,
 			cmmId
 		}
 

@@ -43,41 +43,41 @@ describe('generalFncs.getLevelInfo', () => {
 		expect(result).toEqual({
 			level: 1,
 			xpProgress: 0,
-			xpNeededForNext: 100,
+			xpNeededForNext: 500,
 			percentage: 0,
 			progressBar: '[░░░░░░░░░░]',
 		})
 	})
 
-	test('should return level 1 for 5 posts (50% progress)', () => {
-		const result = general.getLevelInfo(5)
+	test('should return level 1 for 25 posts (50% progress)', () => {
+		const result = general.getLevelInfo(25)
 		expect(result.level).toBe(1)
-		expect(result.xpProgress).toBe(50)
-		expect(result.xpNeededForNext).toBe(100)
+		expect(result.xpProgress).toBe(250)
+		expect(result.xpNeededForNext).toBe(500)
 		expect(result.percentage).toBe(50)
 		expect(result.progressBar).toBe('[█████░░░░░]')
 	})
 
-	test('should level up to 2 at exactly 10 posts', () => {
-		const result = general.getLevelInfo(10)
+	test('should level up to 2 at exactly 50 posts', () => {
+		const result = general.getLevelInfo(50)
 		expect(result.level).toBe(2)
 		expect(result.xpProgress).toBe(0)
-		expect(result.xpNeededForNext).toBe(200)
+		expect(result.xpNeededForNext).toBe(1000)
 		expect(result.percentage).toBe(0)
 		expect(result.progressBar).toBe('[░░░░░░░░░░]')
 	})
 
-	test('should level up to 3 at exactly 30 posts (10 + 20)', () => {
-		const result = general.getLevelInfo(30)
+	test('should level up to 3 at exactly 150 posts (50 + 100)', () => {
+		const result = general.getLevelInfo(150)
 		expect(result.level).toBe(3)
 		expect(result.xpProgress).toBe(0)
-		expect(result.xpNeededForNext).toBe(300)
+		expect(result.xpNeededForNext).toBe(1500)
 	})
 
 	test('should handle high post counts correctly', () => {
-		const result = general.getLevelInfo(100) // 10 (lvl 2) + 20 (lvl 3) + 30 (lvl 4) + 40 (lvl 5)
-		expect(result.level).toBe(5)
+		const result = general.getLevelInfo(300) // 50 (lvl 2) + 100 (lvl 3) + 150 (lvl 4)
+		expect(result.level).toBe(4)
 		expect(result.xpProgress).toBe(0)
-		expect(result.xpNeededForNext).toBe(500)
+		expect(result.xpNeededForNext).toBe(2000)
 	})
 })

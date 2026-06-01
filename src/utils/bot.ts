@@ -83,10 +83,19 @@ export default {
 		if (gamesFiltered.length === 0) return ''
 
 		const gamesFormatted = gamesFiltered
-			.map(
-				(game) =>
-					`${game.mandante.nome} ${game.mandante.gols} x ${game.visitante.gols} ${game.visitante.nome} - ${game.hora} - ${game.local}`
-			)
+			.map((game) => {
+				const hasScore =
+					game.mandante.gols !== null &&
+					game.mandante.gols !== undefined &&
+					String(game.mandante.gols) !== 'null' &&
+					game.visitante.gols !== null &&
+					game.visitante.gols !== undefined &&
+					String(game.visitante.gols) !== 'null'
+
+				return hasScore
+					? `${game.mandante.nome} ${game.mandante.gols} x ${game.visitante.gols} ${game.visitante.nome} - ${game.hora} - ${game.local}`
+					: `${game.mandante.nome} x ${game.visitante.nome} - ${game.hora} - ${game.local}`
+			})
 			.join('\n')
 
 		return gamesFormatted
@@ -418,15 +427,27 @@ export default {
 
 		// 5. Calcular conquistas/medalhas
 		const badges: string[] = []
-		if (totalPosts >= 10) badges.push('🥉 Bronze')
-		if (totalPosts >= 50) badges.push('🥈 Prata')
-		if (totalPosts >= 150) badges.push('🥇 Ouro')
-		if (totalPosts >= 500) badges.push('🏆 Lenda')
+		if (totalPosts >= 100) badges.push('🥉 Bronze')
+		if (totalPosts >= 500) badges.push('🥈 Prata')
+		if (totalPosts >= 2000) badges.push('🥇 Ouro')
+		if (totalPosts >= 5000) badges.push('💎 Platina')
+		if (totalPosts >= 10000) badges.push('🏆 Lenda')
 		if (weeklyPosts > 0) badges.push('⚡ Pé Quente')
 		
 		// Pioneiro: postagens registradas nas primeiras 10 semanas de vida do bot
 		const hasEarlyPost = member?.posts?.slice(0, 10).some((posts) => posts > 0)
 		if (hasEarlyPost) badges.push('🛡️ Pioneiro')
+
+		// Constante: ativo em pelo menos 10 semanas diferentes
+		const activeWeeks = member?.posts?.filter((posts) => posts > 0).length || 0
+		if (activeWeeks >= 10) badges.push('📅 Constante')
+
+		// Veterano: ativo em pelo menos 24 semanas diferentes
+		if (activeWeeks >= 24) badges.push('🎖️ Veterano')
+
+		// Hiperativo: mais de 100 postagens em uma única semana
+		const hasHyperactiveWeek = member?.posts?.some((posts) => posts >= 100)
+		if (hasHyperactiveWeek) badges.push('🔥 Hiperativo')
 
 		const badgesList = badges.length > 0 ? badges.join('\n') : 'Nenhuma medalha ainda :('
 

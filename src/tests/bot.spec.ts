@@ -225,7 +225,7 @@ describe('bot.ts utility functions', () => {
 			mockFindOneMember.mockResolvedValue({
 				userId: 300,
 				cmmId: 100,
-				posts: [5, 10, 15], // total 30 posts (level 3)
+				posts: [50, 100, 150], // total 300 posts (level 4)
 			})
 			mockCountDocuments.mockResolvedValue(2) // 2 reminders
 			mockGetUsers.mockResolvedValue([{ first_name: 'John', last_name: 'Doe' }])
@@ -247,12 +247,12 @@ describe('bot.ts utility functions', () => {
 			)
 			expect(mockCreateComment).toHaveBeenCalledWith(
 				expect.objectContaining({
-					text: expect.stringContaining('⭐ Nível: 3'),
+					text: expect.stringContaining('⭐ Nível: 4'),
 				})
 			)
 			expect(mockCreateComment).toHaveBeenCalledWith(
 				expect.objectContaining({
-					text: expect.stringContaining('📝 Total de postagens: 30'),
+					text: expect.stringContaining('📝 Total de postagens: 300'),
 				})
 			)
 			expect(mockCreateComment).toHaveBeenCalledWith(
@@ -299,7 +299,7 @@ describe('bot.ts utility functions', () => {
 			mockFindOneMember.mockResolvedValue({
 				userId: 300,
 				cmmId: 100,
-				posts: [9], // total 9 posts (level 1) -> 10 posts (level 2)
+				posts: [49], // total 49 posts (level 1) -> 50 posts (level 2)
 			})
 			mockGetUsers.mockResolvedValue([{ first_name: 'John', last_name: 'Doe' }])
 			jest.spyOn(bot, 'getQuoteString').mockResolvedValue('[post400|John],')

@@ -7,13 +7,13 @@ export default {
 
 	getLevelInfo(totalPosts: number): { level: number; xpProgress: number; xpNeededForNext: number; progressBar: string; percentage: number } {
 		let level = 1
-		let postsNeeded = 10
+		let postsNeeded = 50
 		let remaining = totalPosts
 
 		while (remaining >= postsNeeded) {
 			remaining -= postsNeeded
 			level++
-			postsNeeded += 10
+			postsNeeded += 50
 		}
 
 		const xpProgress = remaining * 10

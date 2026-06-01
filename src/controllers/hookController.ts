@@ -17,16 +17,21 @@ export default {
 			const { topic_id: topicId, from_id: userId, id: postId, text: message } = req.body.object
 			const banned = JSON.parse(process.env.BANNED_IDS || '[]')
 
-
 			// Check if post is from a new topic
 			// const isNewTopic = await bot.isTopic(cmmId, topicId, postId)
 
 			// Check if member is banned from using the bot
 			if (banned.includes(userId)) return res.status(200).send('ok')
 
-
 			// Updates member posts number on db
-			await bot.updateMemberPosts(cmmId, userId)
+			await bot.updateMemberPosts(cmmId, userId, topicId, postId)
+
+			// Check if it's a comment in an active Bolao topic
+			const isBolao = await bot.isBolaoTopic(cmmId, topicId)
+			if (isBolao) {
+				await bot.processRoundGuesses(cmmId, userId, topicId, postId, message)
+				return res.status(200).send('ok')
+			}
 
 			// Check if there is a command
 			const command = bot.getCommand(message)

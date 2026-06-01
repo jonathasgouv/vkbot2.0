@@ -1,5 +1,5 @@
 import mongoose from '@config/database'
-import IMembers from '@types/member'
+import IMembers from '@appTypes/member'
 
 // Create a Schema corresponding to the document interface
 const MembersSchema = new mongoose.Schema<IMembers>(

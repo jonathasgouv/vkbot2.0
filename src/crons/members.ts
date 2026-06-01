@@ -1,7 +1,7 @@
 import Member from '@models/Member'
 import vkApi from '@api/vk'
 import bot from '@utils/bot'
-import IMember from '@types/member'
+import IMember from '@appTypes/member'
 
 const getMostPostsText = async (members: IMember[]): Promise<string> => {
 	const membersNamePromises = members.map(async (member) => {
@@ -20,28 +20,34 @@ const getMostPostsText = async (members: IMember[]): Promise<string> => {
 export default {
 	async mostPosts(numberOfMembers: number): Promise<void> {
 		console.info('Creating most posts topic')
-		// Get all communities
-		const cmms = await Member.distinct('cmmId')
+		try {
+			// Get all communities
+			const cmms = await Member.distinct('cmmId')
 
-		cmms.forEach(async (cmmId) => {
-			const members: IMember[] = await Member.find({ cmmId })
-			const membersSortedByLastWeekPosts = members
-				.sort((a, b) => {
-					return b.posts.slice(-1)[0] - a.posts.slice(-1)[0]
-				})
-				.filter((member) => member.userId !== parseInt(process.env.BOT_ID))
+			for (const cmmId of cmms) {
+				const members: IMember[] = await Member.find({ cmmId })
+				const membersSortedByLastWeekPosts = members
+					.sort((a, b) => {
+						const aPosts = a.posts.slice(-1)[0] || 0
+						const bPosts = b.posts.slice(-1)[0] || 0
+						return bPosts - aPosts
+					})
+					.filter((member) => member.userId !== parseInt(process.env.BOT_ID || '0'))
 
-			const membersWithMostPosts = membersSortedByLastWeekPosts.slice(0, numberOfMembers)
+				const membersWithMostPosts = membersSortedByLastWeekPosts.slice(0, numberOfMembers)
+				if (membersWithMostPosts.length === 0) continue
 
-			const topicData = {
-				cmmId,
-				title: `OFF - Top ${numberOfMembers} semanal de postagens`,
-				text: await getMostPostsText(membersWithMostPosts),
+				const topicData = {
+					cmmId,
+					title: `OFF - Top ${numberOfMembers} semanal de postagens`,
+					text: await getMostPostsText(membersWithMostPosts),
+				}
+
+				await vkApi.board.addTopic(topicData)
+				console.info(`Most posts topic created successfully for community ${cmmId}`)
 			}
-
-			await vkApi.board.addTopic(topicData)
-
-			console.info('Most posts topic created sucessfully')
-		})
+		} catch (error) {
+			console.error('Erro ao gerar ranking semanal de postagens:', error)
+		}
 	},
 }

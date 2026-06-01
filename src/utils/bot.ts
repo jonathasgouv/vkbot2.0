@@ -1,25 +1,39 @@
 import vkApi from '@api/vk'
 import cbfApi from '@api/cbf'
+import wikipediaApi from '@api/wikipedia'
 import generalFncs from '@utils/general'
 import Reminder from '@models/Reminder'
 import Member from '@models/Member'
 import Topic from '@models/Topic'
-import ICommandsInput from '@types/bot'
-import ITopic from '@types/topic'
+import BolaoRound from '@models/BolaoRound'
+import Bet from '@models/Bet'
+import type ICommandsInput from '@appTypes/bot'
+import type ITopic from '@appTypes/topic'
 
 export default {
 	async getQuoteString(postId: number, userId: number): Promise<string> {
-		const userData = await vkApi.users.get({ userIds: [userId] })
-		const firstName = userData[0].first_name
-
-		return `[post${postId}|${firstName}],`
+		try {
+			const userData = await vkApi.users.get({ userIds: [userId] })
+			const firstName = userData?.[0]?.first_name || 'Membro'
+			return `[post${postId}|${firstName}],`
+		} catch (error) {
+			console.error(`Erro ao obter dados do usuário para quote (${userId}):`, error)
+			return `[post${postId}|Membro],`
+		}
 	},
 
 	async getTagString(userId: number): Promise<string> {
-		const userData = await vkApi.users.get({ userIds: [userId] })
-		const { first_name, last_name } = userData[0]
-
-		return `[id${userId}|${first_name} ${last_name}]`
+		try {
+			const userData = await vkApi.users.get({ userIds: [userId] })
+			if (userData?.[0]) {
+				const { first_name, last_name } = userData[0]
+				return `[id${userId}|${first_name} ${last_name}]`
+			}
+			return `[id${userId}|Membro]`
+		} catch (error) {
+			console.error(`Erro ao obter dados do usuário para tag (${userId}):`, error)
+			return `[id${userId}|Membro]`
+		}
 	},
 
 	async getSearchResult(query: string, isText: string, isTitle: string): Promise<string> {
@@ -60,13 +74,18 @@ export default {
 	},
 
 	async getGamesFormatted(serie?: string): Promise<string> {
-		const games = await cbfApi.getGames()
-		const gamesFiltered = games.filter((game) => game.competicao === `Campeonato Brasileiro Série ${serie?.toUpperCase() || 'A'}`)
+		const targetSerie = `Série ${serie?.toUpperCase() || 'A'}`
+		const response = await cbfApi.getGames()
+		
+		const brasileiroGames = response.jogos?.['Campeonato Brasileiro']
+		const gamesFiltered = brasileiroGames?.[targetSerie] || []
+
+		if (gamesFiltered.length === 0) return ''
 
 		const gamesFormatted = gamesFiltered
 			.map(
 				(game) =>
-					`${game.nm_mandante} ${game.mandante} x ${game.visitante} ${game.nm_visitante} - ${game.status} - ${game.data}`
+					`${game.mandante.nome} ${game.mandante.gols} x ${game.visitante.gols} ${game.visitante.nome} - ${game.hora} - ${game.local}`
 			)
 			.join('\n')
 
@@ -108,44 +127,64 @@ export default {
 	async isTopic(cmmId: number, topicId: number, postId: number): Promise<boolean> {
 		const comments = await vkApi.board.getComments({
 			groupId: cmmId,
-			topicId: topicId,
+			topicId,
 		})
 
 		return comments.items[0].id === postId
 	},
 
-	async updateMemberPosts(cmmId: number, userId: number): Promise<void> {
-		// Get reminders that are past current day
+	async updateMemberPosts(cmmId: number, userId: number, topicId?: number, postId?: number): Promise<void> {
+		const initialDate = process.env.INITIAL_DATE ? new Date(process.env.INITIAL_DATE) : new Date()
 		const member = await Member.findOne({ cmmId, userId })
-		const weekNumber = generalFncs.weeksBetween(new Date(process.env.INITIAL_DATE), new Date())
+		const weekNumber = generalFncs.weeksBetween(initialDate, new Date())
+
+		const totalPostsBefore = member?.posts?.reduce((acc, curr) => acc + (curr || 0), 0) || 0
+		const totalPostsAfter = totalPostsBefore + 1
 
 		// If member doesn't exists, create it with the new post
 		if (!member) {
 			const posts = []
 			posts[weekNumber] = 1
 
-			Member.create({ cmmId, userId, posts })
+			await Member.create({ cmmId, userId, posts })
+		} else {
+			// If member is already created, just update posts
+			const posts = member.posts
+			posts[weekNumber] = (posts[weekNumber] || 0) + 1
 
-			return
+			await Member.updateOne({ _id: member._id }, { posts })
 		}
 
-		// If member is already created, just update posts
-		const posts = member.posts
-		posts[weekNumber] = (posts[weekNumber] || 0) + 1
+		// Detect and notify Level Up
+		if (topicId && postId) {
+			const infoBefore = generalFncs.getLevelInfo(totalPostsBefore)
+			const infoAfter = generalFncs.getLevelInfo(totalPostsAfter)
 
-		await member.updateOne({ posts })
+			if (infoAfter.level > infoBefore.level) {
+				try {
+					const quote = await this.getQuoteString(postId, userId)
+					const congratsText = `${quote} parabéns! Você subiu para o Nível ${infoAfter.level}! 🎉\nSua barra de progresso: ${infoAfter.progressBar}`
+					
+					await vkApi.board.createComment({ cmmId, topicId, text: congratsText })
+				} catch (error) {
+					console.error('Erro ao enviar mensagem de level up:', error)
+				}
+			}
+		}
 	},
 
 	getTopicDataFromMessage(message: string): { cmm: number; tid: number } | null {
-		const [, cmm, tid] = message.match(/topic-([0-9]*)_([0-9]*)/m)
+		const match = message.match(/topic-([0-9]*)_([0-9]*)/m)
+		if (!match) return null
 
+		const [, cmm, tid] = match
 		if (!cmm || !tid) return null
 
 		return { cmm: parseInt(cmm), tid: parseInt(tid) }
 	},
 
 	getCommand(text: string): string | undefined {
-		return text.match(/!([a-z]*)/m)?.[1]
+		return text.match(/!([a-zA-Z]*)/m)?.[1]?.toLowerCase()
 	},
 
 	getCommandParameters(text: string): string[] | undefined {
@@ -191,6 +230,10 @@ export default {
 			remind: this.remindMe,
 			save: this.saveToTopic,
 			pesquisar: this.searchTopic,
+			perfil: this.sendProfile,
+			bolao: this.sendBolaoLink,
+			ranking: this.sendRanking,
+			wiki: this.searchWiki,
 		}
 
 		// Shorthand versions of commands
@@ -203,6 +246,10 @@ export default {
 			r: 'remind',
 			s: 'save',
 			p: 'pesquisar',
+			pf: 'perfil',
+			b: 'bolao',
+			rk: 'ranking',
+			w: 'wiki',
 		}
 
 		// If it is a shorthand transpiles it to complete version
@@ -294,25 +341,25 @@ export default {
 		if (!reminderDate) return
 
 		const reminderObj = {
-			cmmId: cmmId,
-			topicId: topicId,
-			userId: userId,
-			postId: postId,
+			cmmId,
+			topicId,
+			userId,
+			postId,
 			isMessage: !!isMessage,
 			requestDate: new Date(),
 			expires: reminderDate,
 		}
 
-		Reminder.create(reminderObj)
+		await Reminder.create(reminderObj)
 	},
 
 	async saveToTopic(data: ICommandsInput): Promise<void> {
 		const { topicId, cmmId, message } = data
-		const { cmm: cmmFromMessage, tid: tidFromMessage } = this.getTopicDataFromMessage(message)
+		const topicData = this.getTopicDataFromMessage(message)
+		if (!topicData) return
+
+		const { cmm: cmmFromMessage, tid: tidFromMessage } = topicData
 		const topicTitle = await this.getTopicTitle(cmmId, topicId)
-
-
-		if (!cmmFromMessage || !tidFromMessage) return
 
 		const text = `${topicTitle}
     https://vk.com/topic-${cmmId}_${topicId}`
@@ -331,7 +378,7 @@ export default {
 		const isText = params?.includes('c')
 		const isTitle = params?.includes('t')
 		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
-		const query = (message.split('!pesquisar')[1] || message.split('!p')[1])
+		const query = (message.split(/!pesquisar/i)[1] || message.split(/!p/i)[1])
 			?.replace('-m', '')
 			.replace('-c', '')
 			.replace('-t', '')
@@ -339,10 +386,252 @@ export default {
 
 		const searchResult = await this.getSearchResult(query, isText, isTitle)
 
-		const text = `${quote} ${ searchResult ? `segue o resultado da sua pesquisa:\n\n ${searchResult}` : 'não consegui encontrar nada :('}`
+		const text = `${quote} ${searchResult ? `segue o resultado da sua pesquisa:\n\n ${searchResult}` : 'não consegui encontrar nada :('}`
 
 		isMessage
 			? await vkApi.messages.send({ peerId: userId, message: text })
 			: await vkApi.board.createComment({ topicId, cmmId, text })
+	},
+
+	async sendProfile(data: ICommandsInput): Promise<void> {
+		const { topicId, cmmId, userId, postId, message } = data
+		const params = this.getCommandParameters(message)
+		const isMessage = params?.includes('m')
+
+		// 1. Obter nome/tag do usuário
+		const userTag = await this.getTagString(userId)
+
+		// 2. Buscar dados do membro na comunidade no banco
+		const member = await Member.findOne({ cmmId, userId })
+		
+		const totalPosts = member?.posts?.reduce((acc, curr) => acc + (curr || 0), 0) || 0
+		
+		const initialDate = process.env.INITIAL_DATE ? new Date(process.env.INITIAL_DATE) : new Date()
+		const weekNumber = generalFncs.weeksBetween(initialDate, new Date())
+		const weeklyPosts = member?.posts?.[weekNumber] || 0
+
+		// 3. Obter progresso de nível/XP
+		const lvlInfo = generalFncs.getLevelInfo(totalPosts)
+
+		// 4. Buscar lembretes pendentes
+		const remindersCount = await Reminder.countDocuments({ userId, cmmId })
+
+		// 5. Calcular conquistas/medalhas
+		const badges: string[] = []
+		if (totalPosts >= 10) badges.push('🥉 Bronze')
+		if (totalPosts >= 50) badges.push('🥈 Prata')
+		if (totalPosts >= 150) badges.push('🥇 Ouro')
+		if (totalPosts >= 500) badges.push('🏆 Lenda')
+		if (weeklyPosts > 0) badges.push('⚡ Pé Quente')
+		
+		// Pioneiro: postagens registradas nas primeiras 10 semanas de vida do bot
+		const hasEarlyPost = member?.posts?.slice(0, 10).some((posts) => posts > 0)
+		if (hasEarlyPost) badges.push('🛡️ Pioneiro')
+
+		const badgesList = badges.length > 0 ? badges.join('\n') : 'Nenhuma medalha ainda :('
+
+		// 6. Formatar mensagem de perfil
+		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
+		const responseMessage = `${quote} estatísticas na comunidade de ${userTag}:
+
+⭐ Nível: ${lvlInfo.level} (XP: ${lvlInfo.xpProgress} / ${lvlInfo.xpNeededForNext})
+${lvlInfo.progressBar} ${lvlInfo.percentage}%
+
+📝 Total de postagens: ${totalPosts}
+📅 Postagens nesta semana: ${weeklyPosts}
+⏰ Lembretes pendentes: ${remindersCount}
+
+🏆 Medalhas ganhas:
+${badgesList}`
+
+		// 7. Enviar resposta via DM ou fórum
+		isMessage
+			? await vkApi.messages.send({ peerId: userId, message: responseMessage })
+			: await vkApi.board.createComment({ topicId, cmmId, text: responseMessage })
+	},
+
+	async processRoundGuesses(cmmId: number, userId: number, topicId: number, postId: number, message: string): Promise<void> {
+		try {
+			const round = await BolaoRound.findOne({ cmmId, topicId, processed: false })
+			if (!round) return
+
+			const regex = /(\d+)\.\s*(\d+)\s*[xX-]\s*(\d+)/g
+			let match
+			const registeredGuesses: string[] = []
+			const rejectedGuesses: string[] = []
+
+			const guesses: { index: number; homeScore: number; awayScore: number }[] = []
+			while ((match = regex.exec(message)) !== null) {
+				const index = parseInt(match[1])
+				const homeScore = parseInt(match[2])
+				const awayScore = parseInt(match[3])
+				guesses.push({ index, homeScore, awayScore })
+			}
+
+			if (guesses.length === 0) return
+
+			const quote = await this.getQuoteString(postId, userId)
+
+			for (const guess of guesses) {
+				const game = round.games[guess.index - 1]
+				if (!game) {
+					rejectedGuesses.push(`Jogo ${guess.index} não existe na rodada`)
+					continue
+				}
+
+				const trimmedDate = game.date.trim()
+				const [day, month, year] = trimmedDate.split('/').map(Number)
+				const [hour, minute] = game.time.trim().split(':').map(Number)
+				
+				const pad = (num: number) => String(num).padStart(2, '0')
+				const gameDate = new Date(`${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}:00-03:00`)
+
+				if (Date.now() >= gameDate.getTime()) {
+					rejectedGuesses.push(`${game.homeTeam} x ${game.awayTeam} (já iniciado)`)
+					continue
+				}
+
+				await Bet.updateOne(
+					{ userId, gameId: game.id_jogo },
+					{
+						cmmId,
+						userId,
+						roundId: round._id,
+						gameId: game.id_jogo,
+						homeScore: guess.homeScore,
+						awayScore: guess.awayScore,
+						processed: false,
+						points: null,
+						createdAt: new Date(),
+					},
+					{ upsert: true }
+				)
+
+				registeredGuesses.push(`${game.homeTeam} ${guess.homeScore} x ${guess.awayScore} ${game.awayTeam}`)
+			}
+
+			let responseText = `${quote}\n`
+			if (registeredGuesses.length > 0) {
+				responseText += '✅ Palpites registrados:\n' + registeredGuesses.map(g => `- ${g}`).join('\n')
+			}
+			if (rejectedGuesses.length > 0) {
+				if (registeredGuesses.length > 0) responseText += '\n\n'
+				responseText += '⚠️ Palpites não registrados (jogos iniciados ou inválidos):\n' + rejectedGuesses.map(g => `- ${g}`).join('\n')
+			}
+
+			await vkApi.board.createComment({ cmmId, topicId, text: responseText })
+		} catch (error) {
+			console.error('Erro ao processar palpites do bolão:', error)
+		}
+	},
+
+	async sendRanking(data: ICommandsInput): Promise<void> {
+		const { topicId, cmmId, postId, userId, message } = data
+		const params = this.getCommandParameters(message)
+		const isMessage = params?.includes('m')
+		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
+
+		try {
+			const betsAggregation = await Bet.aggregate([
+				{ $match: { cmmId, processed: true } },
+				{ $group: { _id: '$userId', totalPoints: { $sum: '$points' } } },
+				{ $sort: { totalPoints: -1 } },
+				{ $limit: 10 }
+			])
+
+			if (betsAggregation.length === 0) {
+				const responseText = `${quote} Nenhum palpite foi apurado ainda neste bolão.`
+				isMessage
+					? await vkApi.messages.send({ peerId: userId, message: responseText })
+					: await vkApi.board.createComment({ topicId, cmmId, text: responseText })
+				return
+			}
+
+			const userIds = betsAggregation.map(r => r._id)
+			const vkUsers = await vkApi.users.get({ userIds })
+
+			const rankingLines = betsAggregation.map((row, idx) => {
+				const vkUser = vkUsers.find((u: any) => u.id === row._id)
+				const name = vkUser ? `${vkUser.first_name} ${vkUser.last_name}` : `Membro ${row._id}`
+				return `${idx + 1}. [id${row._id}|${name}] - ${row.totalPoints} pts`
+			})
+
+			const text = `${quote}\n🏆 *Ranking Geral do Bolão* 🏆\n\n${rankingLines.join('\n')}`
+
+			isMessage
+				? await vkApi.messages.send({ peerId: userId, message: text })
+				: await vkApi.board.createComment({ topicId, cmmId, text })
+		} catch (error) {
+			console.error('Erro ao buscar ranking do bolão:', error)
+		}
+	},
+
+	async sendBolaoLink(data: ICommandsInput): Promise<void> {
+		const { topicId, cmmId, postId, userId, message } = data
+		const params = this.getCommandParameters(message)
+		const isMessage = params?.includes('m')
+		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
+
+		try {
+			const activeRound = await BolaoRound.findOne({ cmmId, processed: false }).sort({ createdAt: -1 })
+
+			let text: string
+			if (activeRound) {
+				text = `${quote} ⚽ Participe do Bolão ativo da Rodada ${activeRound.roundNumber} no tópico: https://vk.com/topic-${cmmId}_${activeRound.topicId}`
+			} else {
+				text = `${quote} Não há nenhuma rodada ativa do bolão no momento.`
+			}
+
+			isMessage
+				? await vkApi.messages.send({ peerId: userId, message: text })
+				: await vkApi.board.createComment({ topicId, cmmId, text })
+		} catch (error) {
+			console.error('Erro ao enviar link do bolão:', error)
+		}
+	},
+
+	async isBolaoTopic(cmmId: number, topicId: number): Promise<boolean> {
+		const round = await BolaoRound.findOne({ cmmId, topicId, processed: false })
+		return !!round
+	},
+
+	async searchWiki(data: ICommandsInput): Promise<void> {
+		const { topicId, cmmId, postId, userId, message } = data
+		const params = this.getCommandParameters(message)
+		const isMessage = params?.includes('m')
+		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
+
+		const query = message
+			.replaceAll(/!([a-zA-Z]*)/gm, '')
+			.replaceAll(/-[a-z]/gm, '')
+			.trim()
+
+		if (!query) {
+			const responseText = `${quote} por favor insira um termo para pesquisa. Exemplo: !wiki inteligência artificial`
+			isMessage
+				? await vkApi.messages.send({ peerId: userId, message: responseText })
+				: await vkApi.board.createComment({ topicId, cmmId, text: responseText })
+			return
+		}
+
+		try {
+			const summary = await wikipediaApi.searchAndGetSummary(query)
+
+			if (!summary) {
+				const responseText = `${quote} não consegui encontrar nenhuma informação sobre "${query}" na Wikipédia.`
+				isMessage
+					? await vkApi.messages.send({ peerId: userId, message: responseText })
+					: await vkApi.board.createComment({ topicId, cmmId, text: responseText })
+				return
+			}
+
+			const responseText = `${quote} 📖 *Wikipédia: ${summary.title}* 📖\n\n${summary.extract}\n\nLeia mais em: ${summary.pageUrl}`
+
+			isMessage
+				? await vkApi.messages.send({ peerId: userId, message: responseText })
+				: await vkApi.board.createComment({ topicId, cmmId, text: responseText })
+		} catch (error) {
+			console.error(`Erro no comando de busca da Wikipédia para "${query}":`, error)
+		}
 	},
 }

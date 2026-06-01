@@ -1,5 +1,5 @@
 import mongoose from '@config/database'
-import IReminder from '@types/reminder'
+import IReminder from '@appTypes/reminder'
 
 // Create a Schema corresponding to the document interface
 const ReminderSchema = new mongoose.Schema<IReminder>(

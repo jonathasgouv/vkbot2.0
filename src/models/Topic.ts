@@ -1,5 +1,5 @@
 import mongoose from '@config/database'
-import ITopic from '@types/topic'
+import ITopic from '@appTypes/topic'
 
 // Create a Schema corresponding to the document interface
 const TopicSchema = new mongoose.Schema<ITopic>(

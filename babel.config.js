@@ -21,7 +21,7 @@ module.exports = {
         '@api': './src/api',
         '@utils': './src/utils',
         '@crons': './src/crons',
-        '@types': './src/types'
+        '@appTypes': './src/types'
       }
     }]
   ],

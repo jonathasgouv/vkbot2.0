@@ -5,19 +5,31 @@ import bot from '@utils/bot'
 export default {
 	async saveTopics(): Promise<void> {
 		console.info('Saving topics')
+		try {
+			const cmms = await Member.distinct('cmmId')
 
-		const cmms = await Member.distinct('cmmId')
+			for (const cmm of cmms) {
+				const topics = await bot.getLastTopics(100, cmm)
+				if (!topics || topics.length === 0) continue
 
-		cmms.forEach(async (cmm) => {
-			const topics = await bot.getLastTopics(100, cmm)
+				const topicIds = topics.map((t) => t._id)
 
-			topics.forEach(async topic => {
-				const alreadyExists = await Topic.findById(topic._id)
+				// Busca tópicos já existentes no banco para este lote em uma única consulta
+				const existingTopics = await Topic.find({ _id: { $in: topicIds } }, '_id')
+				const existingIds = new Set(existingTopics.map((t) => t._id))
 
-				if (!alreadyExists) Topic.create(topic)
-			})
+				// Filtra apenas os novos tópicos que não estão no banco
+				const newTopics = topics.filter((t) => !existingIds.has(t._id))
+
+				if (newTopics.length > 0) {
+					// Inserção em lote (Bulk Insert) de alta performance
+					await Topic.insertMany(newTopics)
+				}
+			}
 
 			console.info('Topics saved successfully')
-		})
+		} catch (error) {
+			console.error('Erro ao salvar tópicos:', error)
+		}
 	},
 }

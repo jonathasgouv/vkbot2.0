@@ -16,6 +16,13 @@
         "@typescript-eslint"
     ],
     "rules": {
-        "no-unused-vars": "off"
+        "no-unused-vars": "off",
+        "indent": "off",
+        "no-tabs": "off",
+        "comma-dangle": "off",
+        "space-before-function-paren": "off",
+        "no-trailing-spaces": "off",
+        "import/first": "off",
+        "camelcase": "off"
     }
 }

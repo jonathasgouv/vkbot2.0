@@ -11,21 +11,34 @@ export default {
 			expires: { $lte: new Date() },
 		})
 
-		// Send reminders
-		reminders.forEach(async (reminder) => {
-			const { cmmId, topicId, userId, postId, isMessage, _id } = reminder
-			const quote = !isMessage ? await bot.getQuoteString(postId, userId) : ''
-			const text = `${quote} estou te lembrando, como você pediu :)
+		if (reminders.length === 0) {
+			console.info('No reminders to process')
+			return
+		}
+
+		// Send reminders concurrently and safely
+		const promises = reminders.map(async (reminder) => {
+			try {
+				const { cmmId, topicId, userId, postId, isMessage } = reminder
+				const quote = !isMessage ? await bot.getQuoteString(postId, userId) : ''
+				const text = `${quote} estou te lembrando, como você pediu :)
       ${isMessage ? `https://vk.com/topic-${cmmId}_${topicId}?post=${postId}` : ''}`
 
-			// Send message or comment
-			isMessage
-				? vkApi.messages.send({ peerId: userId, message: text })
-				: vkApi.board.createComment({ cmmId, topicId, text })
+				// Send message or comment and wait for result
+				if (isMessage) {
+					await vkApi.messages.send({ peerId: userId, message: text })
+				} else {
+					await vkApi.board.createComment({ cmmId, topicId, text })
+				}
 
-			// Delete reminder from database
-			reminder.delete()
+				// Delete reminder from database using non-deprecated method
+				await reminder.deleteOne()
+			} catch (error) {
+				console.error(`Erro ao processar o lembrete com ID ${reminder._id}:`, error)
+			}
 		})
+
+		await Promise.all(promises)
 
 		console.info('Reminders answered successfully')
 	},

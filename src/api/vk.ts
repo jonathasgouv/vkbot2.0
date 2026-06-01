@@ -1,5 +1,5 @@
 import vkApi from '@config/axios'
-import { IAddLike, IAddTopic, ICreateBoardComment, IGetBoardComments, IGetTopicsComments, IGetUser, ISendMessage } from '@types/vk'
+import { IAddLike, IAddTopic, ICreateBoardComment, IGetBoardComments, IGetTopicsComments, IGetUser, ISendMessage } from '@appTypes/vk'
 
 export default {
 	board: {

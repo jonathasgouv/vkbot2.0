@@ -6,6 +6,7 @@ kill_timeout = 5
 mounts = []
 primary_region = "gru"
 processes = []
+swap_size_mb = 512
 
 [env]
   PORT = "8080"

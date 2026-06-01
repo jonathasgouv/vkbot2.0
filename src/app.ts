@@ -156,19 +156,29 @@ app.get('/api/ranking', async (request, response) => {
 		])
 
 		// Resolve VK profile details with memory caching
+		// Ensure all IDs are valid numbers, filtering out falsy/invalid values
 		const allUserIds = Array.from(new Set([
-			...members.map(m => m.userId),
-			...bolao.map(b => b._id)
-		]))
+			...members.map(m => Number(m.userId)),
+			...bolao.map(b => Number(b._id))
+		])).filter(id => typeof id === 'number' && !isNaN(id) && id > 0)
 
-		const missingUserIds = allUserIds.filter(id => {
+		// Optimize name resolution: if search is empty, only fetch profiles for top 50 displayed users.
+		// Otherwise, fetch all of them to allow client-side searching by name.
+		const targetUserIds = searchQuery
+			? allUserIds
+			: Array.from(new Set([
+				...members.slice(0, 50).map(m => Number(m.userId)),
+				...bolao.slice(0, 50).map(b => Number(b._id))
+			])).filter(id => typeof id === 'number' && !isNaN(id) && id > 0)
+
+		const missingUserIds = targetUserIds.filter(id => {
 			const cachedUser = vkUserCache.get(id)
 			return !cachedUser || (now - cachedUser.timestamp > VK_USER_CACHE_TTL)
 		})
 
 		if (missingUserIds.length > 0) {
-			for (let i = 0; i < missingUserIds.length; i += 1000) {
-				const chunk = missingUserIds.slice(i, i + 1000)
+			for (let i = 0; i < missingUserIds.length; i += 100) {
+				const chunk = missingUserIds.slice(i, i + 100)
 				try {
 					const fetched = await vkApi.users.get({
 						userIds: chunk,
@@ -184,6 +194,10 @@ app.get('/api/ranking', async (request, response) => {
 							})
 						}
 					}
+					// Add a small 100ms delay between chunks to respect rate limits if we are fetching multiple pages
+					if (missingUserIds.length > 100 && i + 100 < missingUserIds.length) {
+						await new Promise(resolve => setTimeout(resolve, 100))
+					}
 				} catch (err) {
 					console.error('Error fetching missing VK users:', err)
 				}
@@ -192,7 +206,7 @@ app.get('/api/ranking', async (request, response) => {
 
 		// Map RPG ranking and assign absolute ranks
 		const rpgRanking = members.map((m, index) => {
-			const cachedUser = vkUserCache.get(m.userId)
+			const cachedUser = vkUserCache.get(Number(m.userId))
 			const name = cachedUser ? `${cachedUser.first_name} ${cachedUser.last_name}` : `Membro ${m.userId}`
 			const photo = cachedUser?.photo_100 || 'https://vk.com/images/camera_100.png'
 			const lvlInfo = generalFncs.getLevelInfo(m.totalPosts)
@@ -246,7 +260,7 @@ app.get('/api/ranking', async (request, response) => {
 
 		// Map Bolão ranking and assign absolute ranks
 		const bolaoRanking = bolao.map((b, index) => {
-			const cachedUser = vkUserCache.get(b._id)
+			const cachedUser = vkUserCache.get(Number(b._id))
 			const name = cachedUser ? `${cachedUser.first_name} ${cachedUser.last_name}` : `Membro ${b._id}`
 			const photo = cachedUser?.photo_100 || 'https://vk.com/images/camera_100.png'
 			return {

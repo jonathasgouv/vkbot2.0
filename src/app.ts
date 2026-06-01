@@ -62,11 +62,15 @@ app.get('/api/ranking', async (request, response) => {
 		if (request.query.cmmId) {
 			cmmId = parseInt(request.query.cmmId as string)
 		} else {
-			const communities = await Member.distinct('cmmId')
-			if (communities.length === 0) {
+			const cmmCounts = await Member.aggregate([
+				{ $group: { _id: '$cmmId', count: { $sum: 1 } } },
+				{ $sort: { count: -1 } },
+				{ $limit: 1 }
+			])
+			if (cmmCounts.length === 0) {
 				return response.json({ rpg: [], bolao: [], cmmId: null })
 			}
-			cmmId = communities[0]
+			cmmId = cmmCounts[0]._id
 		}
 
 		const cacheKey = `cmm_${cmmId}`
@@ -80,7 +84,13 @@ app.get('/api/ranking', async (request, response) => {
 		// 1. RPG ranking (Top 20)
 		const members = await Member.aggregate([
 			{ $match: { cmmId } },
-			{ $addFields: { totalPosts: { $sum: '$posts' } } },
+			{ $addFields: { totalPosts: {
+				$reduce: {
+					input: { $ifNull: ['$posts', []] },
+					initialValue: 0,
+					in: { $add: ['$$value', { $ifNull: ['$$this', 0] }] }
+				}
+			} } },
 			{ $sort: { totalPosts: -1 } },
 			{ $limit: 20 }
 		])

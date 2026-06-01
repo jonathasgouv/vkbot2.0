@@ -251,6 +251,7 @@ export default {
 			ranking: this.sendRanking,
 			rankingrpg: this.sendRpgRanking,
 			wiki: this.searchWiki,
+			vs: this.sendComparison,
 		}
 
 		// Shorthand versions of commands
@@ -411,6 +412,78 @@ export default {
 			: await vkApi.board.createComment({ topicId, cmmId, text })
 	},
 
+	async calculateBadges(
+		member: any,
+		totalPosts: number,
+		weeklyPosts: number,
+		weeksOfHouse: number,
+		firstActiveWeek: number,
+		userId: number,
+		cmmId: number
+	): Promise<string[]> {
+		const badges: string[] = []
+		if (totalPosts >= 100) badges.push('🥉 Bronze (100+ posts)')
+		if (totalPosts >= 500) badges.push('🥈 Prata (500+ posts)')
+		if (totalPosts >= 2000) badges.push('🥇 Ouro (2.000+ posts)')
+		if (totalPosts >= 5000) badges.push('💎 Platina (5.000+ posts)')
+		if (totalPosts >= 10000) badges.push('🏆 Lenda (10.000+ posts)')
+		if (totalPosts >= 25000) badges.push('👑 Imperador (25.000+ posts)')
+		if (totalPosts >= 50000) badges.push('🚀 Mestre do Cartola (50.000+ posts)')
+		if (totalPosts >= 75000) badges.push('💫 Mítico (75.000+ posts)')
+		if (totalPosts >= 100000) badges.push('🔱 Deus do Cartola (100.000+ posts)')
+
+		if (weeklyPosts > 0) badges.push('⚡ Pé Quente (Ativo esta semana)')
+		
+		const hasEarlyPost = member?.posts?.slice(0, 10).some((posts: number) => posts > 0)
+		if (hasEarlyPost) badges.push('🛡️ Pioneiro (Primeiras 10 semanas)')
+
+		const activeWeeks = member?.posts?.filter((posts: number) => posts > 0).length || 0
+		if (activeWeeks >= 10) badges.push('📅 Constante (Ativo em 10+ semanas)')
+		if (activeWeeks >= 24) badges.push('🎖️ Veterano (Ativo em 24+ semanas)')
+
+		const hasHyperactiveWeek = member?.posts?.some((posts: number) => posts >= 100)
+		if (hasHyperactiveWeek) badges.push('🔥 Hiperativo (100+ posts em 1 semana)')
+
+		if (firstActiveWeek !== -1) {
+			if (weeksOfHouse >= 20) {
+				badges.push('👴 Old (Membro antigo)')
+			} else if (weeksOfHouse <= 4) {
+				badges.push('👶 Modinha (Membro recente)')
+			}
+		}
+
+		if (member?.coruja) {
+			badges.push('🦉 Coruja (Postou de madrugada)')
+		}
+
+		const peDeAnjoBet = await Bet.findOne({ userId, points: 5 })
+		if (peDeAnjoBet) {
+			badges.push('🎯 Pé de Anjo (Acertou placar exato no Bolão)')
+		}
+
+		const bolaoRanking = await Bet.aggregate([
+			{ $match: { cmmId, processed: true } },
+			{ $group: { _id: '$userId', totalPoints: { $sum: '$points' } } },
+			{ $sort: { totalPoints: -1 } },
+			{ $limit: 1 }
+		])
+		if (bolaoRanking.length > 0) {
+			const topPoints = bolaoRanking[0].totalPoints
+			if (topPoints > 0) {
+				const userBolaoPoints = await Bet.aggregate([
+					{ $match: { cmmId, userId, processed: true } },
+					{ $group: { _id: '$userId', totalPoints: { $sum: '$points' } } }
+				])
+				const userPoints = userBolaoPoints[0]?.totalPoints || 0
+				if (userPoints === topPoints) {
+					badges.push('👑 Rei do Bolão (Líder do Bolão)')
+				}
+			}
+		}
+
+		return badges
+	},
+
 	async sendProfile(data: ICommandsInput): Promise<void> {
 		const { topicId, cmmId, userId, postId, message } = data
 		const params = this.getCommandParameters(message)
@@ -451,74 +524,15 @@ export default {
 		}
 
 		// 6. Calcular conquistas/medalhas
-		const badges: string[] = []
-		if (totalPosts >= 100) badges.push('🥉 Bronze (100+ posts)')
-		if (totalPosts >= 500) badges.push('🥈 Prata (500+ posts)')
-		if (totalPosts >= 2000) badges.push('🥇 Ouro (2.000+ posts)')
-		if (totalPosts >= 5000) badges.push('💎 Platina (5.000+ posts)')
-		if (totalPosts >= 10000) badges.push('🏆 Lenda (10.000+ posts)')
-		if (totalPosts >= 25000) badges.push('👑 Imperador (25.000+ posts)')
-		if (totalPosts >= 50000) badges.push('🚀 Mestre do Cartola (50.000+ posts)')
-		if (totalPosts >= 75000) badges.push('💫 Mítico (75.000+ posts)')
-		if (totalPosts >= 100000) badges.push('🔱 Deus do Cartola (100.000+ posts)')
-
-		if (weeklyPosts > 0) badges.push('⚡ Pé Quente (Ativo esta semana)')
-		
-		// Pioneiro: postagens registradas nas primeiras 10 semanas de vida do bot
-		const hasEarlyPost = member?.posts?.slice(0, 10).some((posts) => posts > 0)
-		if (hasEarlyPost) badges.push('🛡️ Pioneiro (Primeiras 10 semanas)')
-
-		// Constante: ativo em pelo menos 10 semanas diferentes
-		const activeWeeks = member?.posts?.filter((posts) => posts > 0).length || 0
-		if (activeWeeks >= 10) badges.push('📅 Constante (Ativo em 10+ semanas)')
-
-		// Veterano: ativo em pelo menos 24 semanas diferentes
-		if (activeWeeks >= 24) badges.push('🎖️ Veterano (Ativo em 24+ semanas)')
-
-		// Hiperativo: mais de 100 postagens em uma única semana
-		const hasHyperactiveWeek = member?.posts?.some((posts) => posts >= 100)
-		if (hasHyperactiveWeek) badges.push('🔥 Hiperativo (100+ posts em 1 semana)')
-
-		// Tempo de Casa badges
-		if (firstActiveWeek !== -1) {
-			if (weeksOfHouse >= 20) {
-				badges.push('👴 Old (Membro antigo)')
-			} else if (weeksOfHouse <= 4) {
-				badges.push('👶 Modinha (Membro recente)')
-			}
-		}
-
-		// Coruja: postou de madrugada (entre 00:00 e 05:59 BRT)
-		if (member?.coruja) {
-			badges.push('🦉 Coruja (Postou de madrugada)')
-		}
-
-		// Pé de Anjo: acertou ao menos um placar exato no Bolão (5 pontos)
-		const peDeAnjoBet = await Bet.findOne({ userId, points: 5 })
-		if (peDeAnjoBet) {
-			badges.push('🎯 Pé de Anjo (Acertou placar exato no Bolão)')
-		}
-
-		// Rei do Bolão: primeiro lugar geral do ranking de pontuação do Bolão
-		const bolaoRanking = await Bet.aggregate([
-			{ $match: { cmmId, processed: true } },
-			{ $group: { _id: '$userId', totalPoints: { $sum: '$points' } } },
-			{ $sort: { totalPoints: -1 } },
-			{ $limit: 1 }
-		])
-		if (bolaoRanking.length > 0) {
-			const topPoints = bolaoRanking[0].totalPoints
-			if (topPoints > 0) {
-				const userBolaoPoints = await Bet.aggregate([
-					{ $match: { cmmId, userId, processed: true } },
-					{ $group: { _id: '$userId', totalPoints: { $sum: '$points' } } }
-				])
-				const userPoints = userBolaoPoints[0]?.totalPoints || 0
-				if (userPoints === topPoints) {
-					badges.push('👑 Rei do Bolão (Líder do Bolão)')
-				}
-			}
-		}
+		const badges = await this.calculateBadges(
+			member,
+			totalPosts,
+			weeklyPosts,
+			weeksOfHouse,
+			firstActiveWeek,
+			userId,
+			cmmId
+		)
 
 		const badgesList = badges.length > 0 ? badges.join('\n') : 'Nenhuma medalha ainda :('
 
@@ -541,6 +555,168 @@ ${badgesList}`
 		isMessage
 			? await vkApi.messages.send({ peerId: userId, message: responseMessage })
 			: await vkApi.board.createComment({ topicId, cmmId, text: responseMessage })
+	},
+
+	async sendComparison(data: ICommandsInput): Promise<void> {
+		const { topicId, cmmId, userId, postId, message } = data
+		const params = this.getCommandParameters(message)
+		const isMessage = params?.includes('m')
+		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
+
+		const match = message.match(/\[id(\d+)\|/i) || message.match(/id(\d+)/i) || message.match(/!vs\s+(\d+)/i)
+		const targetUserId = match ? parseInt(match[1]) : null
+
+		if (!targetUserId) {
+			const responseText = `${quote} ⚠️ Por favor, mencione o membro que deseja comparar. Exemplo: !vs @membro`
+			isMessage
+				? await vkApi.messages.send({ peerId: userId, message: responseText })
+				: await vkApi.board.createComment({ topicId, cmmId, text: responseText })
+			return
+		}
+
+		try {
+			const vkUsers = await vkApi.users.get({ userIds: [userId, targetUserId] })
+			const callerUser = vkUsers.find((u: any) => u.id === userId)
+			const targetUser = vkUsers.find((u: any) => u.id === targetUserId)
+
+			const callerName = callerUser ? `${callerUser.first_name} ${callerUser.last_name}` : `Membro ${userId}`
+			const targetName = targetUser ? `${targetUser.first_name} ${targetUser.last_name}` : `Membro ${targetUserId}`
+
+			const callerMember = await Member.findOne({ cmmId, userId })
+			const targetMember = await Member.findOne({ cmmId, userId: targetUserId })
+
+			const initialDate = process.env.INITIAL_DATE ? new Date(process.env.INITIAL_DATE) : new Date()
+			const weekNumber = generalFncs.weeksBetween(initialDate, new Date())
+
+			const callerTotalPosts = callerMember?.posts?.reduce((acc, curr) => acc + (curr || 0), 0) || 0
+			const callerWeeklyPosts = callerMember?.posts?.[weekNumber] || 0
+			const callerLvlInfo = generalFncs.getLevelInfo(callerTotalPosts)
+
+			let callerWeeksOfHouse = 0
+			let callerMonthsOfHouse = 0
+			let callerFirstActiveWeek = -1
+			if (callerMember && callerMember.posts) {
+				callerFirstActiveWeek = callerMember.posts.findIndex((p) => (p || 0) > 0)
+				if (callerFirstActiveWeek !== -1) {
+					const joinDate = new Date(initialDate.getTime() + callerFirstActiveWeek * 7 * 24 * 60 * 60 * 1000)
+					const diffTime = Math.abs(new Date().getTime() - joinDate.getTime())
+					callerWeeksOfHouse = Math.floor(diffTime / (7 * 24 * 60 * 60 * 1000))
+					callerMonthsOfHouse = Math.floor(callerWeeksOfHouse / 4.34)
+				}
+			}
+
+			const callerBolao = await Bet.aggregate([
+				{ $match: { cmmId, userId, processed: true } },
+				{ $group: { _id: '$userId', totalPoints: { $sum: '$points' } } }
+			])
+			const callerPoints = callerBolao[0]?.totalPoints || 0
+			const callerBadges = await this.calculateBadges(
+				callerMember,
+				callerTotalPosts,
+				callerWeeklyPosts,
+				callerWeeksOfHouse,
+				callerFirstActiveWeek,
+				userId,
+				cmmId
+			)
+
+			const targetTotalPosts = targetMember?.posts?.reduce((acc, curr) => acc + (curr || 0), 0) || 0
+			const targetWeeklyPosts = targetMember?.posts?.[weekNumber] || 0
+			const targetLvlInfo = generalFncs.getLevelInfo(targetTotalPosts)
+
+			let targetWeeksOfHouse = 0
+			let targetMonthsOfHouse = 0
+			let targetFirstActiveWeek = -1
+			if (targetMember && targetMember.posts) {
+				targetFirstActiveWeek = targetMember.posts.findIndex((p) => (p || 0) > 0)
+				if (targetFirstActiveWeek !== -1) {
+					const joinDate = new Date(initialDate.getTime() + targetFirstActiveWeek * 7 * 24 * 60 * 60 * 1000)
+					const diffTime = Math.abs(new Date().getTime() - joinDate.getTime())
+					targetWeeksOfHouse = Math.floor(diffTime / (7 * 24 * 60 * 60 * 1000))
+					targetMonthsOfHouse = Math.floor(targetWeeksOfHouse / 4.34)
+				}
+			}
+
+			const targetBolao = await Bet.aggregate([
+				{ $match: { cmmId, userId: targetUserId, processed: true } },
+				{ $group: { _id: '$userId', totalPoints: { $sum: '$points' } } }
+			])
+			const targetPoints = targetBolao[0]?.totalPoints || 0
+			const targetBadges = await this.calculateBadges(
+				targetMember,
+				targetTotalPosts,
+				targetWeeklyPosts,
+				targetWeeksOfHouse,
+				targetFirstActiveWeek,
+				targetUserId,
+				cmmId
+			)
+
+			const getWinner = (valA: number, valB: number, nameA: string, nameB: string): string => {
+				if (valA > valB) return nameA
+				if (valB > valA) return nameB
+				return 'Empate 🤝'
+			}
+
+			let levelWinner = 'Empate 🤝'
+			if (callerLvlInfo.level > targetLvlInfo.level) {
+				levelWinner = callerName
+			} else if (targetLvlInfo.level > callerLvlInfo.level) {
+				levelWinner = targetName
+			} else {
+				levelWinner = getWinner(callerLvlInfo.xpProgress, targetLvlInfo.xpProgress, callerName, targetName)
+			}
+
+			const postsWinner = getWinner(callerTotalPosts, targetTotalPosts, callerName, targetName)
+			const weeklyWinner = getWinner(callerWeeklyPosts, targetWeeklyPosts, callerName, targetName)
+			const houseWinner = getWinner(callerWeeksOfHouse, targetWeeksOfHouse, callerName, targetName)
+			const bolaoWinner = getWinner(callerPoints, targetPoints, callerName, targetName)
+			const badgesWinner = getWinner(callerBadges.length, targetBadges.length, callerName, targetName)
+
+			const text = `${quote} comparativo direto entre os membros:
+
+📊 *Comparativo Geral* 📊
+
+👤 *Membro A*: [id${userId}|${callerName}]
+👤 *Membro B*: [id${targetUserId}|${targetName}]
+
+⭐ Nível:
+- Membro A: Nível ${callerLvlInfo.level} (XP: ${callerLvlInfo.xpProgress} / ${callerLvlInfo.xpNeededForNext})
+- Membro B: Nível ${targetLvlInfo.level} (XP: ${targetLvlInfo.xpProgress} / ${targetLvlInfo.xpNeededForNext})
+➔ Vencedor: ${levelWinner}
+
+📝 Total de postagens:
+- Membro A: ${callerTotalPosts} posts
+- Membro B: ${targetTotalPosts} posts
+➔ Vencedor: ${postsWinner}
+
+📅 Postagens nesta semana:
+- Membro A: ${callerWeeklyPosts} posts
+- Membro B: ${targetWeeklyPosts} posts
+➔ Vencedor: ${weeklyWinner}
+
+📅 Tempo de casa:
+- Membro A: ${callerMonthsOfHouse} meses (${callerWeeksOfHouse} semanas)
+- Membro B: ${targetMonthsOfHouse} meses (${targetWeeksOfHouse} semanas)
+➔ Vencedor: ${houseWinner}
+
+⚽ Pontos no Bolão:
+- Membro A: ${callerPoints} pts
+- Membro B: ${targetPoints} pts
+➔ Vencedor: ${bolaoWinner}
+
+🏆 Total de Medalhas:
+- Membro A: ${callerBadges.length}
+- Membro B: ${targetBadges.length}
+➔ Vencedor: ${badgesWinner}`
+
+			isMessage
+				? await vkApi.messages.send({ peerId: userId, message: text })
+				: await vkApi.board.createComment({ topicId, cmmId, text: text })
+
+		} catch (error) {
+			console.error('Erro ao realizar comparativo direto:', error)
+		}
 	},
 
 	async processRoundGuesses(cmmId: number, userId: number, topicId: number, postId: number, message: string): Promise<void> {
@@ -667,7 +843,13 @@ ${badgesList}`
 		try {
 			const members = await Member.aggregate([
 				{ $match: { cmmId } },
-				{ $addFields: { totalPosts: { $sum: '$posts' } } },
+				{ $addFields: { totalPosts: {
+					$reduce: {
+						input: { $ifNull: ['$posts', []] },
+						initialValue: 0,
+						in: { $add: ['$$value', { $ifNull: ['$$this', 0] }] }
+					}
+				} } },
 				{ $sort: { totalPosts: -1 } },
 				{ $limit: 10 }
 			])

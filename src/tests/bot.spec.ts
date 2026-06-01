@@ -75,6 +75,18 @@ jest.mock('@models/Reminder', () => {
 	}
 })
 
+const mockFindOneBet = jest.fn()
+const mockAggregateBet = jest.fn()
+jest.mock('@models/Bet', () => {
+	return {
+		__esModule: true,
+		default: {
+			findOne: mockFindOneBet,
+			aggregate: mockAggregateBet,
+		}
+	}
+})
+
 import bot from '@utils/bot'
 
 describe('bot.ts utility functions', () => {
@@ -220,6 +232,8 @@ describe('bot.ts utility functions', () => {
 	describe('sendProfile', () => {
 		beforeEach(() => {
 			jest.clearAllMocks()
+			mockFindOneBet.mockResolvedValue(null)
+			mockAggregateBet.mockResolvedValue([])
 		})
 
 		test('should format and send profile to board when isMessage is false', async () => {
@@ -259,6 +273,11 @@ describe('bot.ts utility functions', () => {
 			expect(mockCreateComment).toHaveBeenCalledWith(
 				expect.objectContaining({
 					text: expect.stringContaining('⏰ Lembretes pendentes: 2'),
+				})
+			)
+			expect(mockCreateComment).toHaveBeenCalledWith(
+				expect.objectContaining({
+					text: expect.stringContaining('📅 Tempo de casa:'),
 				})
 			)
 			expect(mockCreateComment).toHaveBeenCalledWith(
@@ -326,6 +345,82 @@ describe('bot.ts utility functions', () => {
 			await bot.updateMemberPosts(100, 300, 200, 400)
 
 			expect(mockCreateComment).not.toHaveBeenCalled()
+		})
+	})
+
+	describe('sendComparison', () => {
+		beforeEach(() => {
+			jest.clearAllMocks()
+			mockFindOneBet.mockResolvedValue(null)
+			mockAggregateBet.mockResolvedValue([])
+		})
+
+		test('should request target user mention if none provided', async () => {
+			await bot.sendComparison({
+				userId: 300,
+				cmmId: 100,
+				topicId: 200,
+				postId: 400,
+				message: '!vs',
+			})
+
+			expect(mockCreateComment).toHaveBeenCalledWith(
+				expect.objectContaining({
+					cmmId: 100,
+					topicId: 200,
+					text: expect.stringContaining('⚠️ Por favor, mencione o membro que deseja comparar'),
+				})
+			)
+		})
+
+		test('should format and send comparison if target user is valid', async () => {
+			mockGetUsers.mockResolvedValue([
+				{ id: 300, first_name: 'John', last_name: 'Doe' },
+				{ id: 301, first_name: 'Jane', last_name: 'Smith' },
+			])
+
+			mockFindOneMember.mockImplementation(async (query) => {
+				if (query.userId === 300) {
+					return { userId: 300, cmmId: 100, posts: [20, 40] } // total 60 (level 4)
+				}
+				if (query.userId === 301) {
+					return { userId: 301, cmmId: 100, posts: [50, 100] } // total 150 (level 6)
+				}
+				return null
+			})
+
+			mockAggregateBet.mockResolvedValue([])
+
+			await bot.sendComparison({
+				userId: 300,
+				cmmId: 100,
+				topicId: 200,
+				postId: 400,
+				message: '!vs [id301|Jane Smith]',
+			})
+
+			expect(mockCreateComment).toHaveBeenCalledWith(
+				expect.objectContaining({
+					cmmId: 100,
+					topicId: 200,
+					text: expect.stringContaining('comparativo direto entre os membros:'),
+				})
+			)
+			expect(mockCreateComment).toHaveBeenCalledWith(
+				expect.objectContaining({
+					text: expect.stringContaining('Membro A: Nível 4'),
+				})
+			)
+			expect(mockCreateComment).toHaveBeenCalledWith(
+				expect.objectContaining({
+					text: expect.stringContaining('Membro B: Nível 6'),
+				})
+			)
+			expect(mockCreateComment).toHaveBeenCalledWith(
+				expect.objectContaining({
+					text: expect.stringContaining('Vencedor: Jane Smith'),
+				})
+			)
 		})
 	})
 })

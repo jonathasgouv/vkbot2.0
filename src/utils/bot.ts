@@ -427,27 +427,27 @@ export default {
 
 		// 5. Calcular conquistas/medalhas
 		const badges: string[] = []
-		if (totalPosts >= 100) badges.push('🥉 Bronze')
-		if (totalPosts >= 500) badges.push('🥈 Prata')
-		if (totalPosts >= 2000) badges.push('🥇 Ouro')
-		if (totalPosts >= 5000) badges.push('💎 Platina')
-		if (totalPosts >= 10000) badges.push('🏆 Lenda')
-		if (weeklyPosts > 0) badges.push('⚡ Pé Quente')
+		if (totalPosts >= 100) badges.push('🥉 Bronze (100+ posts)')
+		if (totalPosts >= 500) badges.push('🥈 Prata (500+ posts)')
+		if (totalPosts >= 2000) badges.push('🥇 Ouro (2.000+ posts)')
+		if (totalPosts >= 5000) badges.push('💎 Platina (5.000+ posts)')
+		if (totalPosts >= 10000) badges.push('🏆 Lenda (10.000+ posts)')
+		if (weeklyPosts > 0) badges.push('⚡ Pé Quente (Ativo esta semana)')
 		
 		// Pioneiro: postagens registradas nas primeiras 10 semanas de vida do bot
 		const hasEarlyPost = member?.posts?.slice(0, 10).some((posts) => posts > 0)
-		if (hasEarlyPost) badges.push('🛡️ Pioneiro')
+		if (hasEarlyPost) badges.push('🛡️ Pioneiro (Primeiras 10 semanas)')
 
 		// Constante: ativo em pelo menos 10 semanas diferentes
 		const activeWeeks = member?.posts?.filter((posts) => posts > 0).length || 0
-		if (activeWeeks >= 10) badges.push('📅 Constante')
+		if (activeWeeks >= 10) badges.push('📅 Constante (Ativo em 10+ semanas)')
 
 		// Veterano: ativo em pelo menos 24 semanas diferentes
-		if (activeWeeks >= 24) badges.push('🎖️ Veterano')
+		if (activeWeeks >= 24) badges.push('🎖️ Veterano (Ativo em 24+ semanas)')
 
 		// Hiperativo: mais de 100 postagens em uma única semana
 		const hasHyperactiveWeek = member?.posts?.some((posts) => posts >= 100)
-		if (hasHyperactiveWeek) badges.push('🔥 Hiperativo')
+		if (hasHyperactiveWeek) badges.push('🔥 Hiperativo (100+ posts em 1 semana)')
 
 		const badgesList = badges.length > 0 ? badges.join('\n') : 'Nenhuma medalha ainda :('
 

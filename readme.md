@@ -72,6 +72,34 @@ Os comandos do bot devem ser digitados em tópicos de discussão do VK e iniciad
 
 ---
 
+## 🎮 Sistema de RPG e Medalhas
+
+O bot conta com um sistema de engajamento gamificado (RPG) integrado que acompanha a atividade dos membros nos tópicos da comunidade.
+
+### 📈 Mecânica de Nível e XP
+- **XP (Pontos de Experiência)**: Cada postagem válida registrada pelo bot concede **10 XP** ao usuário.
+- **Progressão**: O limiar de postagens para subir de nível aumenta de forma incremental a cada nível alcançado:
+  - **Nível 1 ➔ Nível 2**: Necessários 10 posts (100 XP).
+  - **Nível 2 ➔ Nível 3**: Necessários mais 20 posts adicionais (200 XP).
+  - **Nível 3 ➔ Nível 4**: Necessários mais 30 posts adicionais (300 XP).
+  - Em geral, alcançar o próximo nível exige `10 * Nível Atual` postagens.
+- **Gráfico ASCII**: O comando `!perfil` renderiza uma barra de progresso ASCII dinâmica de 10 blocos (Ex: `[████░░░░░░] 40%`) demonstrando a porcentagem de conclusão para o próximo nível.
+- **Notificação Automática**: Sempre que um usuário atinge os requisitos do próximo nível, o bot envia uma mensagem parabenizando o membro diretamente no fórum da comunidade com sua nova barra de progresso.
+
+### 🏆 Medalhas e Conquistas
+As medalhas e conquistas ganhas pelos membros são computadas automaticamente e listadas no comando `!perfil`. Elas se dividem em:
+
+| Medalha | Requisito de Conquista |
+| :--- | :--- |
+| **🥉 Bronze** | Alcançar um total acumulado de **10 postagens**. |
+| **🥈 Prata** | Alcançar um total acumulado de **50 postagens**. |
+| **🥇 Ouro** | Alcançar um total acumulado de **150 postagens**. |
+| **🏆 Lenda** | Alcançar um total acumulado de **500 postagens**. |
+| **⚡ Pé Quente** | Estar ativo na semana corrente (pelo menos 1 postagem registrada na semana atual). |
+| **🛡️ Pioneiro** | Ter postagens ativas dentro das primeiras 10 semanas de vida útil do bot na comunidade. |
+
+---
+
 ## ⏰ Cron Jobs (Tarefas Agendadas)
 
 O bot executa crons automáticos com base no fuso horário de `America/Sao_Paulo`:

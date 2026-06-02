@@ -568,7 +568,7 @@
 				const urlParams = new URLSearchParams(window.location.search);
 				const cmmId = urlParams.get('cmmId') || '';
 				
-				const fetchUrl = `/api/ranking?cmmId=${cmmId}&period=${currentPeriod}&search=${encodeURIComponent(currentSearch)}`;
+				const fetchUrl = `/api/ranking?cmmId=${cmmId}&period=${currentPeriod}&search=${encodeURIComponent(currentSearch)}&type=${currentRpgMode}`;
 				const response = await fetch(fetchUrl);
 				if (!response.ok) throw new Error('Falha ao obter o ranking');
 				
@@ -651,7 +651,7 @@
 			document.getElementById('mode-engagement').classList.toggle('active', mode === 'engagement');
 			document.getElementById('mode-general').classList.toggle('active', mode === 'general');
 			
-			renderRpgList(cachedRpgData);
+			loadRanking();
 		}
 
 		function renderRpgList(members) {

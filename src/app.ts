@@ -84,7 +84,8 @@ app.get('/api/ranking', async (request, response) => {
 
 		const period = (request.query.period as string) || 'overall'
 		const searchQuery = (request.query.search as string || '').trim().toLowerCase()
-		const cacheKey = `cmm_${cmmId}_${period}_${searchQuery}`
+		const type = (request.query.type as string) || 'activity'
+		const cacheKey = `cmm_${cmmId}_${period}_${type}_${searchQuery}`
 		const cached = rankingCache.get(cacheKey)
 		const now = Date.now()
 
@@ -131,12 +132,40 @@ app.get('/api/ranking', async (request, response) => {
 			}
 		}
 
-		// RPG Ranking (Fetch all to assign absolute ranks)
+		// RPG Ranking (Fetch all members of the community)
 		const members = await Member.aggregate([
 			{ $match: { cmmId, userId: { $ne: botId } } },
-			{ $addFields: { totalPosts: postsExpression } },
-			{ $sort: { totalPosts: -1 } }
+			{ $addFields: { totalPosts: postsExpression } }
 		])
+
+		// Calculate engagement and general XP in memory
+		const calculatedMembers = members.map((m) => {
+			const totalLikes = m.totalLikesReceived || 0
+			const totalTopics = m.totalTopicsCreated || 0
+			const totalComments = m.totalCommentsOnTopics || 0
+			const engagementXp = (totalLikes * 10) + (totalTopics * 30) + (totalComments * 5)
+			const generalXp = (m.totalPosts * 10) + engagementXp
+			return {
+				member: m,
+				engagementXp,
+				generalXp
+			}
+		})
+
+		// Sort in memory by the selected type to assign ranks
+		if (type === 'activity') {
+			calculatedMembers.sort((a, b) => b.member.totalPosts - a.member.totalPosts)
+		} else if (type === 'engagement') {
+			calculatedMembers.sort((a, b) => b.engagementXp - a.engagementXp)
+		} else if (type === 'general') {
+			calculatedMembers.sort((a, b) => b.generalXp - a.generalXp)
+		}
+
+		// Assign ranks based on sorted order
+		const sortedMembersWithRank = calculatedMembers.map((item, index) => ({
+			...item,
+			rank: index + 1
+		}))
 
 		// Dynamic Bolão matches date matching query
 		const betsMatchQuery: any = { cmmId, processed: true, userId: { $ne: botId } }
@@ -158,18 +187,18 @@ app.get('/api/ranking', async (request, response) => {
 		// Resolve VK profile details with memory caching
 		// Ensure all IDs are valid numbers, filtering out falsy/invalid values
 		const allUserIds = Array.from(new Set([
-			...members.map(m => Number(m.userId)),
+			...sortedMembersWithRank.map(m => Number(m.member.userId)),
 			...bolao.map(b => Number(b._id))
 		])).filter(id => typeof id === 'number' && !isNaN(id) && id > 0)
 
 		// Optimize name resolution: 
-		// 1. If search is empty, only fetch profiles for the top 50 displayed users.
+		// 1. If search is empty, only fetch profiles for the top 50 displayed users of the sorted list.
 		// 2. If search is numeric, only fetch profile for that specific user.
 		// 3. Otherwise (name search), fetch all to allow substring matching.
 		let targetUserIds: number[] = []
 		if (!searchQuery) {
 			targetUserIds = Array.from(new Set([
-				...members.slice(0, 50).map(m => Number(m.userId)),
+				...sortedMembersWithRank.slice(0, 50).map(m => Number(m.member.userId)),
 				...bolao.slice(0, 50).map(b => Number(b._id))
 			]))
 		} else if (/^\d+$/.test(searchQuery)) {
@@ -214,21 +243,15 @@ app.get('/api/ranking', async (request, response) => {
 		}
 
 		// Map RPG ranking and assign absolute ranks
-		const rpgRanking = members.map((m, index) => {
+		const rpgRanking = sortedMembersWithRank.map((item) => {
+			const m = item.member
 			const cachedUser = vkUserCache.get(Number(m.userId))
 			const name = cachedUser ? `${cachedUser.first_name} ${cachedUser.last_name}` : `Membro ${m.userId}`
 			const photo = cachedUser?.photo_100 || 'https://vk.com/images/camera_100.png'
 			
 			const lvlInfo = generalFncs.getLevelInfo(m.totalPosts * 10)
-			
-			const totalLikes = m.totalLikesReceived || 0
-			const totalTopics = m.totalTopicsCreated || 0
-			const totalComments = m.totalCommentsOnTopics || 0
-			const engagementXp = (totalLikes * 10) + (totalTopics * 30) + (totalComments * 5)
-			const engagementLvlInfo = generalFncs.getLevelInfo(engagementXp)
-			
-			const generalXp = (m.totalPosts * 10) + engagementXp
-			const generalLvlInfo = generalFncs.getLevelInfo(generalXp)
+			const engagementLvlInfo = generalFncs.getLevelInfo(item.engagementXp)
+			const generalLvlInfo = generalFncs.getLevelInfo(item.generalXp)
 			
 			// Calcular tempo de casa
 			const firstActiveWeek = m.posts ? m.posts.findIndex((p: number) => (p || 0) > 0) : -1
@@ -273,18 +296,18 @@ app.get('/api/ranking', async (request, response) => {
 				percentage: lvlInfo.percentage,
 				houseTime: `${monthsOfHouse} meses (${weeksOfHouse} semanas)`,
 				badges,
-				rank: index + 1,
-				totalLikes,
-				totalTopics,
-				totalComments,
-				engagementXp,
+				rank: item.rank,
+				totalLikes: m.totalLikesReceived || 0,
+				totalTopics: m.totalTopicsCreated || 0,
+				totalComments: m.totalCommentsOnTopics || 0,
+				engagementXp: item.engagementXp,
 				engagementLevel: engagementLvlInfo.level,
-				engagementProgressBar: engagementLvlInfo.progressBar,
-				engagementPercentage: engagementLvlInfo.percentage,
-				generalXp,
-				generalLevel: generalLvlInfo.level,
-				generalProgressBar: generalLvlInfo.progressBar,
-				generalPercentage: generalLvlInfo.percentage
+				engagementProgressBar: engagementLvlInfo.engagementProgressBar || engagementLvlInfo.progressBar,
+				engagementPercentage: engagementLvlInfo.engagementPercentage || engagementLvlInfo.percentage,
+				generalXp: item.generalXp,
+				generalLevel: generalLvlInfo.generalLevel || generalLvlInfo.level,
+				generalProgressBar: generalLvlInfo.generalProgressBar || generalLvlInfo.progressBar,
+				generalPercentage: generalLvlInfo.generalPercentage || generalLvlInfo.percentage
 			}
 		})
 

@@ -16,7 +16,12 @@ export default {
 
 				for (const topic of activeTopics) {
 					const topicId = topic._id
+					// Sync only the latest 200 comments for active topics to prevent rate limits/memory issues
+					const maxCommentsToSync = 200
 					let offset = 0
+					if (topic.commentsCount && topic.commentsCount > maxCommentsToSync) {
+						offset = Math.floor((topic.commentsCount - maxCommentsToSync) / 100) * 100
+					}
 					let hasMore = true
 					const allCommentsToSave = []
 

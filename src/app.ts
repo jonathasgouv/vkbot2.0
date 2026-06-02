@@ -227,6 +227,9 @@ app.get('/api/ranking', async (request, response) => {
 			const engagementXp = (totalLikes * 10) + (totalTopics * 30) + (totalComments * 5)
 			const engagementLvlInfo = generalFncs.getLevelInfo(engagementXp)
 			
+			const generalXp = (m.totalPosts * 10) + engagementXp
+			const generalLvlInfo = generalFncs.getLevelInfo(generalXp)
+			
 			// Calcular tempo de casa
 			const firstActiveWeek = m.posts ? m.posts.findIndex((p: number) => (p || 0) > 0) : -1
 			let weeksOfHouse = 0
@@ -277,7 +280,11 @@ app.get('/api/ranking', async (request, response) => {
 				engagementXp,
 				engagementLevel: engagementLvlInfo.level,
 				engagementProgressBar: engagementLvlInfo.progressBar,
-				engagementPercentage: engagementLvlInfo.percentage
+				engagementPercentage: engagementLvlInfo.percentage,
+				generalXp,
+				generalLevel: generalLvlInfo.level,
+				generalProgressBar: generalLvlInfo.progressBar,
+				generalPercentage: generalLvlInfo.percentage
 			}
 		})
 
@@ -337,12 +344,13 @@ app.get('/', (request, response) => {
 
 if (process.env.NODE_ENV !== 'test') {
 	mongoose.connection.once('open', () => {
-		console.info('Database connected. Triggering one-off startup sync for topics and comments...')
+		const isFullBackfill = process.env.RUN_FULL_BACKFILL === 'true'
+		console.info(`Database connected. Triggering startup sync (Full Backfill: ${isFullBackfill})`)
 		import('@crons/topics')
 			.then((m) => m.default.saveTopics())
 			.catch((err) => console.error('Error in startup topics sync:', err))
 		import('@crons/comments')
-			.then((m) => m.default.syncCommentsAndLikes())
+			.then((m) => m.default.syncCommentsAndLikes(isFullBackfill))
 			.catch((err) => console.error('Error in startup comments sync:', err))
 	})
 }

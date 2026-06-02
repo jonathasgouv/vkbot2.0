@@ -527,6 +527,9 @@ export default {
 
 		const activityLvlInfo = generalFncs.getLevelInfo(totalPosts * 10)
 		const engagementLvlInfo = generalFncs.getLevelInfo(engagementXp)
+		
+		const generalXp = (totalPosts * 10) + engagementXp
+		const generalLvlInfo = generalFncs.getLevelInfo(generalXp)
 
 		// 4. Buscar lembretes pendentes
 		const remindersCount = await Reminder.countDocuments({ userId, cmmId })
@@ -563,6 +566,9 @@ export default {
 		// 7. Formatar mensagem de perfil
 		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
 		const responseMessage = `${quote} estatísticas na comunidade de ${userTag}:
+
+⭐ Nível Geral: ${generalLvlInfo.level} (XP: ${generalXp} / ${generalLvlInfo.xpNeededForNext} pts)
+${generalLvlInfo.progressBar} ${generalLvlInfo.percentage}%
 
 ⚔️ Nível de Atividade: ${activityLvlInfo.level} (XP: ${activityLvlInfo.xpProgress / 10} / ${activityLvlInfo.xpNeededForNext / 10} posts)
 ${activityLvlInfo.progressBar} ${activityLvlInfo.percentage}%
@@ -1056,7 +1062,24 @@ Resumo:`
 						in: { $add: ['$$value', { $ifNull: ['$$this', 0] }] }
 					}
 				} } },
-				{ $sort: { totalPosts: -1 } },
+				{ $addFields: {
+					engagementXp: {
+						$add: [
+							{ $multiply: [{ $ifNull: ['$totalLikesReceived', 0] }, 10] },
+							{ $multiply: [{ $ifNull: ['$totalTopicsCreated', 0] }, 30] },
+							{ $multiply: [{ $ifNull: ['$totalCommentsOnTopics', 0] }, 5] }
+						]
+					}
+				} },
+				{ $addFields: {
+					generalXp: {
+						$add: [
+							{ $multiply: ['$totalPosts', 10] },
+							'$engagementXp'
+						]
+					}
+				} },
+				{ $sort: { generalXp: -1 } },
 				{ $limit: 10 }
 			])
 
@@ -1074,11 +1097,11 @@ Resumo:`
 			const rankingLines = members.map((row, idx) => {
 				const vkUser = vkUsers.find((u: any) => u.id === row.userId)
 				const name = vkUser ? `${vkUser.first_name} ${vkUser.last_name}` : `Membro ${row.userId}`
-				const lvlInfo = generalFncs.getLevelInfo(row.totalPosts * 10)
-				return `${idx + 1}. [id${row.userId}|${name}] - Nível ${lvlInfo.level} (${row.totalPosts} posts)`
+				const generalLvlInfo = generalFncs.getLevelInfo(row.generalXp)
+				return `${idx + 1}. [id${row.userId}|${name}] - Nível ${generalLvlInfo.level} (XP: ${row.generalXp}) (Posts: ${row.totalPosts} | Likes rec.: ${row.totalLikesReceived || 0} | Tópicos: ${row.totalTopicsCreated || 0})`
 			})
 
-			const text = `${quote}\n🏆 *Ranking Geral do RPG* 🏆\n\n${rankingLines.join('\n')}`
+			const text = `${quote}\n🏆 *Ranking Geral do RPG (Atividade + Engajamento)* 🏆\n\n${rankingLines.join('\n')}`
 
 			isMessage
 				? await vkApi.messages.send({ peerId: userId, message: text })

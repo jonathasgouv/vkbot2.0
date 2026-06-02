@@ -587,6 +587,7 @@
 							<div class="rpg-mode-selector">
 								<button class="mode-btn ${currentRpgMode === 'activity' ? 'active' : ''}" id="mode-activity" onclick="switchRpgMode('activity')">Atividade</button>
 								<button class="mode-btn ${currentRpgMode === 'engagement' ? 'active' : ''}" id="mode-engagement" onclick="switchRpgMode('engagement')">Engajamento</button>
+								<button class="mode-btn ${currentRpgMode === 'general' ? 'active' : ''}" id="mode-general" onclick="switchRpgMode('general')">Geral</button>
 							</div>
 						</div>
 						<div class="list-container" id="rpg-list"></div>
@@ -648,6 +649,7 @@
 			
 			document.getElementById('mode-activity').classList.toggle('active', mode === 'activity');
 			document.getElementById('mode-engagement').classList.toggle('active', mode === 'engagement');
+			document.getElementById('mode-general').classList.toggle('active', mode === 'general');
 			
 			renderRpgList(cachedRpgData);
 		}
@@ -666,8 +668,10 @@
 			const sorted = [...members];
 			if (currentRpgMode === 'activity') {
 				sorted.sort((a, b) => b.totalPosts - a.totalPosts);
-			} else {
+			} else if (currentRpgMode === 'engagement') {
 				sorted.sort((a, b) => b.engagementXp - a.engagementXp);
+			} else {
+				sorted.sort((a, b) => b.generalXp - a.generalXp);
 			}
 
 			sorted.forEach((member, index) => {
@@ -690,7 +694,7 @@
 							<div class="user-info">
 								<a href="https://vk.com/id${member.userId}" target="_blank" class="user-name">${member.name}</a>
 								<div class="user-meta">
-									<div class="meta-item">Nível Atividade: <strong>${member.level}</strong></div>
+									<div class="meta-item">Nível de atividade: <strong>${member.level}</strong></div>
 									<div class="meta-item">Casa: <strong>${member.houseTime}</strong></div>
 								</div>
 								<div class="rpg-progress">
@@ -706,13 +710,13 @@
 									${badgesHTML}
 								</div>
 							</div>
-							<div class="score-box">
-								<div class="score-val">${member.totalPosts}</div>
+							<div class="score-box activity-score" style="background: rgba(0, 242, 254, 0.08); border: 1px solid rgba(0, 242, 254, 0.20); padding: 0.4rem 0.75rem; border-radius: 12px; min-width: 80px; text-align: center;">
+								<div class="score-val" style="color: var(--primary); text-shadow: 0 0 10px rgba(0, 242, 254, 0.3);">${member.totalPosts}</div>
 								<div class="score-label">posts</div>
 							</div>
 						</div>
 					`;
-				} else {
+				} else if (currentRpgMode === 'engagement') {
 					rpgList.innerHTML += `
 						<div class="ranking-item ${posClass}">
 							<div class="rank-badge">${rank}</div>
@@ -722,7 +726,7 @@
 							<div class="user-info">
 								<a href="https://vk.com/id${member.userId}" target="_blank" class="user-name">${member.name}</a>
 								<div class="user-meta">
-									<div class="meta-item">Nível Engajamento: <strong>${member.engagementLevel}</strong></div>
+									<div class="meta-item">Nível de engajamento: <strong>${member.engagementLevel}</strong></div>
 									<div class="meta-item">❤️ <strong>${member.totalLikes}</strong> likes rec. | 📝 <strong>${member.totalTopics}</strong> tópicos | 💬 <strong>${member.totalComments}</strong> comt. recebidos</div>
 								</div>
 								<div class="rpg-progress">
@@ -740,6 +744,38 @@
 							</div>
 							<div class="score-box engagement-score" style="background: rgba(0, 242, 254, 0.08); border: 1px solid rgba(0, 242, 254, 0.20); padding: 0.4rem 0.75rem; border-radius: 12px; min-width: 80px; text-align: center;">
 								<div class="score-val" style="color: var(--primary); text-shadow: 0 0 10px rgba(0, 242, 254, 0.3);">${member.engagementXp}</div>
+								<div class="score-label">XP pts</div>
+							</div>
+						</div>
+					`;
+				} else {
+					rpgList.innerHTML += `
+						<div class="ranking-item ${posClass}">
+							<div class="rank-badge">${rank}</div>
+							<div class="avatar-container">
+								<img src="${member.photo}" alt="${member.name}" class="avatar">
+							</div>
+							<div class="user-info">
+								<a href="https://vk.com/id${member.userId}" target="_blank" class="user-name">${member.name}</a>
+								<div class="user-meta">
+									<div class="meta-item">Nível de engajamento geral: <strong>${member.generalLevel}</strong></div>
+									<div class="meta-item">✍️ <strong>${member.totalPosts}</strong> posts | ❤️ <strong>${member.totalLikes}</strong> likes rec. | 📝 <strong>${member.totalTopics}</strong> tópicos | 💬 <strong>${member.totalComments}</strong> comt. recebidos</div>
+								</div>
+								<div class="rpg-progress">
+									<div class="progress-track">
+										<div class="progress-bar" style="width: ${member.generalPercentage}%"></div>
+									</div>
+									<div class="progress-text">
+										<span>XP: ${member.generalProgressBar}</span>
+										<span>${member.generalPercentage}%</span>
+									</div>
+								</div>
+								<div class="badges-wrap">
+									${badgesHTML}
+								</div>
+							</div>
+							<div class="score-box general-score" style="background: rgba(0, 242, 254, 0.08); border: 1px solid rgba(0, 242, 254, 0.20); padding: 0.4rem 0.75rem; border-radius: 12px; min-width: 80px; text-align: center;">
+								<div class="score-val" style="color: var(--primary); text-shadow: 0 0 10px rgba(0, 242, 254, 0.3);">${member.generalXp}</div>
 								<div class="score-label">XP pts</div>
 							</div>
 						</div>

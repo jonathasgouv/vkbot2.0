@@ -4,24 +4,30 @@ import bot from '@utils/bot'
 import vkApi from '@api/vk'
 
 export default {
-	async syncCommentsAndLikes(): Promise<void> {
-		console.info('Syncing comments and likes from VK')
+	async syncCommentsAndLikes(isFullBackfill = false): Promise<void> {
+		console.info(`Syncing comments and likes from VK (Full Backfill: ${isFullBackfill})`)
 		try {
 			const cmms = await Member.distinct('cmmId')
 
 			for (const cmmId of cmms) {
-				// Fetch the 30 most recently active topics
-				const activeTopics = await bot.getLastTopics(30, cmmId)
+				// Fetch topics: 100 for full backfill, 30 for routine sync
+				const topicsCount = isFullBackfill ? 100 : 30
+				const activeTopics = await bot.getLastTopics(topicsCount, cmmId)
 				if (!activeTopics || activeTopics.length === 0) continue
 
 				for (const topic of activeTopics) {
 					const topicId = topic._id
-					// Sync only the latest 200 comments for active topics to prevent rate limits/memory issues
-					const maxCommentsToSync = 200
+					
 					let offset = 0
-					if (topic.commentsCount && topic.commentsCount > maxCommentsToSync) {
-						offset = Math.floor((topic.commentsCount - maxCommentsToSync) / 100) * 100
+					if (!isFullBackfill) {
+						// Sync only the latest 200 comments for active topics during routine sync
+						const maxCommentsToSync = 200
+						if (topic.commentsCount && topic.commentsCount > maxCommentsToSync) {
+							offset = Math.floor((topic.commentsCount - maxCommentsToSync) / 100) * 100
+						}
 					}
+					// For full backfill, offset starts at 0 to get all historical comments!
+
 					let hasMore = true
 					const allCommentsToSave = []
 

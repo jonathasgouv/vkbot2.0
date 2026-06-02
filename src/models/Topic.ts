@@ -28,6 +28,14 @@ const TopicSchema = new mongoose.Schema<ITopic>(
 			type: 'boolean',
 			required: true,
 		},
+		createdAt: {
+			type: Date,
+			required: false,
+		},
+		commentsCount: {
+			type: 'number',
+			default: 0,
+		},
 	},
 	{
 		collection: 'topics',

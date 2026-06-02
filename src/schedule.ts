@@ -3,6 +3,7 @@ import reminder from '@crons/reminder'
 import members from '@crons/members'
 import topics from '@crons/topics'
 import bolao from '@crons/bolao'
+import comments from '@crons/comments'
 
 cron.schedule('* * * * *', reminder.sendResponses, {
 	scheduled: true,
@@ -13,6 +14,10 @@ cron.schedule('0 17 * * SAT', () => members.mostPosts(8), {
 	timezone: 'America/Sao_Paulo',
 })
 cron.schedule('*/10 * * * *', topics.saveTopics, {
+	scheduled: true,
+	timezone: 'America/Sao_Paulo',
+})
+cron.schedule('*/30 * * * *', comments.syncCommentsAndLikes, {
 	scheduled: true,
 	timezone: 'America/Sao_Paulo',
 })

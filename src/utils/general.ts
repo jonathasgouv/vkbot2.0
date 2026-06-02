@@ -5,33 +5,33 @@ export default {
 		return Math.abs(Math.floor((finalDate.getTime() - initialDate.getTime()) / weeksInMilliseconds))
 	},
 
-	getLevelInfo(totalPosts: number): { level: number; xpProgress: number; xpNeededForNext: number; progressBar: string; percentage: number } {
+	getLevelInfo(xp: number): { level: number; xpProgress: number; xpNeededForNext: number; progressBar: string; percentage: number } {
 		let level = 1
-		let remaining = totalPosts
+		let remaining = xp
 
-		const getRequiredPosts = (lvl: number): number => {
+		const getRequiredXp = (lvl: number): number => {
 			if (lvl <= 10) {
-				return lvl * 10
+				return lvl * 100
 			} else if (lvl <= 30) {
-				return 100 + (lvl - 10) * 50
+				return 1000 + (lvl - 10) * 500
 			} else {
-				return 1100 + (lvl - 30) * 200
+				return 11000 + (lvl - 30) * 2000
 			}
 		}
 
-		let postsNeeded = getRequiredPosts(level)
-		while (remaining >= postsNeeded) {
-			remaining -= postsNeeded
+		let xpNeeded = getRequiredXp(level)
+		while (remaining >= xpNeeded) {
+			remaining -= xpNeeded
 			level++
-			postsNeeded = getRequiredPosts(level)
+			xpNeeded = getRequiredXp(level)
 		}
 
-		const xpProgress = remaining * 10
-		const xpNeededForNext = postsNeeded * 10
-		const percentage = Math.round((xpProgress / xpNeededForNext) * 100)
+		const xpProgress = remaining
+		const xpNeededForNext = xpNeeded
+		const percentage = Math.round((xpProgress / xpNeededForNext) * 100) || 0
 
 		// Gera uma barra de progresso ASCII de 10 caracteres
-		const filledBlocks = Math.round(percentage / 10)
+		const filledBlocks = Math.min(10, Math.round(percentage / 10))
 		const emptyBlocks = 10 - filledBlocks
 		const progressBar = `[${'█'.repeat(filledBlocks)}${'░'.repeat(emptyBlocks)}]`
 

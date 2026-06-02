@@ -4,7 +4,7 @@ import bot from '@utils/bot'
 
 export default {
 	async saveTopics(): Promise<void> {
-		console.info('Saving topics')
+		console.info('Saving topics and updating engagement stats')
 		try {
 			const cmms = await Member.distinct('cmmId')
 
@@ -12,18 +12,53 @@ export default {
 				const topics = await bot.getLastTopics(100, cmm)
 				if (!topics || topics.length === 0) continue
 
-				const topicIds = topics.map((t) => t._id)
+				// Use bulkWrite to upsert/update all topics in a single call
+				const bulkOps = topics.map((t) => ({
+					updateOne: {
+						filter: { _id: t._id },
+						update: {
+							$set: {
+								cmmId: t.cmmId,
+								title: t.title,
+								first_comment: t.first_comment,
+								created_by: t.created_by,
+								is_fixed: t.is_fixed,
+								createdAt: t.createdAt,
+								commentsCount: t.commentsCount,
+							}
+						},
+						upsert: true
+					}
+				}))
 
-				// Busca tópicos já existentes no banco para este lote em uma única consulta
-				const existingTopics = await Topic.find({ _id: { $in: topicIds } }, '_id')
-				const existingIds = new Set(existingTopics.map((t) => t._id))
+				if (bulkOps.length > 0) {
+					await Topic.bulkWrite(bulkOps)
+				}
 
-				// Filtra apenas os novos tópicos que não estão no banco
-				const newTopics = topics.filter((t) => !existingIds.has(t._id))
+				// Aggregate topic creator stats for this community
+				const creatorsStats = await Topic.aggregate([
+					{ $match: { cmmId: cmm } },
+					{ $group: { _id: '$created_by', topicsCount: { $sum: 1 }, totalComments: { $sum: '$commentsCount' } } }
+				])
 
-				if (newTopics.length > 0) {
-					// Inserção em lote (Bulk Insert) de alta performance
-					await Topic.insertMany(newTopics)
+				// Reset all members stats first to handle deleted/removed topics
+				await Member.updateMany({ cmmId: cmm }, { totalTopicsCreated: 0, totalCommentsOnTopics: 0 })
+
+				// Update creators stats
+				const memberBulkOps = creatorsStats.map((stat) => ({
+					updateOne: {
+						filter: { cmmId: cmm, userId: stat._id },
+						update: {
+							$set: {
+								totalTopicsCreated: stat.topicsCount,
+								totalCommentsOnTopics: stat.totalComments,
+							}
+						}
+					}
+				}))
+
+				if (memberBulkOps.length > 0) {
+					await Member.bulkWrite(memberBulkOps)
 				}
 			}
 

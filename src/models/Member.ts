@@ -20,6 +20,18 @@ const MembersSchema = new mongoose.Schema<IMembers>(
 			type: 'boolean',
 			required: false,
 		},
+		totalLikesReceived: {
+			type: 'number',
+			default: 0,
+		},
+		totalTopicsCreated: {
+			type: 'number',
+			default: 0,
+		},
+		totalCommentsOnTopics: {
+			type: 'number',
+			default: 0,
+		},
 	},
 	{ collection: 'members' }
 )

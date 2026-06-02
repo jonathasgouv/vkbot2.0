@@ -218,7 +218,14 @@ app.get('/api/ranking', async (request, response) => {
 			const cachedUser = vkUserCache.get(Number(m.userId))
 			const name = cachedUser ? `${cachedUser.first_name} ${cachedUser.last_name}` : `Membro ${m.userId}`
 			const photo = cachedUser?.photo_100 || 'https://vk.com/images/camera_100.png'
-			const lvlInfo = generalFncs.getLevelInfo(m.totalPosts)
+			
+			const lvlInfo = generalFncs.getLevelInfo(m.totalPosts * 10)
+			
+			const totalLikes = m.totalLikesReceived || 0
+			const totalTopics = m.totalTopicsCreated || 0
+			const totalComments = m.totalCommentsOnTopics || 0
+			const engagementXp = (totalLikes * 10) + (totalTopics * 30) + (totalComments * 5)
+			const engagementLvlInfo = generalFncs.getLevelInfo(engagementXp)
 			
 			// Calcular tempo de casa
 			const firstActiveWeek = m.posts ? m.posts.findIndex((p: number) => (p || 0) > 0) : -1
@@ -263,7 +270,14 @@ app.get('/api/ranking', async (request, response) => {
 				percentage: lvlInfo.percentage,
 				houseTime: `${monthsOfHouse} meses (${weeksOfHouse} semanas)`,
 				badges,
-				rank: index + 1
+				rank: index + 1,
+				totalLikes,
+				totalTopics,
+				totalComments,
+				engagementXp,
+				engagementLevel: engagementLvlInfo.level,
+				engagementProgressBar: engagementLvlInfo.progressBar,
+				engagementPercentage: engagementLvlInfo.percentage
 			}
 		})
 

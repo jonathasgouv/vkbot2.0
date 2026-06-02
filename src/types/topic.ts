@@ -5,4 +5,6 @@ export default interface ITopic {
 	first_comment?: string
 	created_by: number
 	is_fixed: boolean
+	createdAt?: Date
+	commentsCount?: number
 }

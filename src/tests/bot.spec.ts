@@ -296,12 +296,12 @@ describe('bot.ts utility functions', () => {
 			)
 			expect(mockCreateComment).toHaveBeenCalledWith(
 				expect.objectContaining({
-					text: expect.stringContaining('⭐ Nível: 8'),
+					text: expect.stringContaining('⚔️ Nível de Atividade: 8'),
 				})
 			)
 			expect(mockCreateComment).toHaveBeenCalledWith(
 				expect.objectContaining({
-					text: expect.stringContaining('📝 Total de postagens: 300'),
+					text: expect.stringContaining('📝 Postagens: 300'),
 				})
 			)
 			expect(mockCreateComment).toHaveBeenCalledWith(
@@ -337,7 +337,7 @@ describe('bot.ts utility functions', () => {
 			expect(mockSend).toHaveBeenCalledWith(
 				expect.objectContaining({
 					peerId: 300,
-					message: expect.stringContaining('Nível: 1'),
+					message: expect.stringContaining('Nível de Atividade: 1'),
 				})
 			)
 			expect(mockCreateComment).not.toHaveBeenCalled()

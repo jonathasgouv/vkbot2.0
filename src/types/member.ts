@@ -3,4 +3,7 @@ export default interface IMember {
 	cmmId: number
 	posts: number[]
 	coruja?: boolean
+	totalLikesReceived?: number
+	totalTopicsCreated?: number
+	totalCommentsOnTopics?: number
 }

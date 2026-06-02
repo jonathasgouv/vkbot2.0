@@ -122,6 +122,8 @@ export default {
 				first_comment: item.first_comment,
 				created_by: item.created_by,
 				is_fixed: item.is_fixed,
+				createdAt: new Date(item.created * 1000),
+				commentsCount: item.comments,
 			}
 		})
 
@@ -177,8 +179,8 @@ export default {
 
 		// Detect and notify Level Up
 		if (topicId && postId) {
-			const infoBefore = generalFncs.getLevelInfo(totalPostsBefore)
-			const infoAfter = generalFncs.getLevelInfo(totalPostsAfter)
+			const infoBefore = generalFncs.getLevelInfo(totalPostsBefore * 10)
+			const infoAfter = generalFncs.getLevelInfo(totalPostsAfter * 10)
 
 			if (infoAfter.level > infoBefore.level) {
 				try {
@@ -514,7 +516,17 @@ export default {
 		const weeklyPosts = member?.posts?.[weekNumber] || 0
 
 		// 3. Obter progresso de nível/XP
-		const lvlInfo = generalFncs.getLevelInfo(totalPosts)
+		const totalLikes = member?.totalLikesReceived || 0
+		const totalTopics = member?.totalTopicsCreated || 0
+		const totalComments = member?.totalCommentsOnTopics || 0
+
+		// Formulas:
+		// Activity XP = Posts * 10
+		// Engagement XP = (Likes * 10) + (Topics * 30) + (Comments * 5)
+		const engagementXp = (totalLikes * 10) + (totalTopics * 30) + (totalComments * 5)
+
+		const activityLvlInfo = generalFncs.getLevelInfo(totalPosts * 10)
+		const engagementLvlInfo = generalFncs.getLevelInfo(engagementXp)
 
 		// 4. Buscar lembretes pendentes
 		const remindersCount = await Reminder.countDocuments({ userId, cmmId })
@@ -552,11 +564,16 @@ export default {
 		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
 		const responseMessage = `${quote} estatísticas na comunidade de ${userTag}:
 
-⭐ Nível: ${lvlInfo.level} (XP: ${lvlInfo.xpProgress} / ${lvlInfo.xpNeededForNext})
-${lvlInfo.progressBar} ${lvlInfo.percentage}%
+⚔️ Nível de Atividade: ${activityLvlInfo.level} (XP: ${activityLvlInfo.xpProgress / 10} / ${activityLvlInfo.xpNeededForNext / 10} posts)
+${activityLvlInfo.progressBar} ${activityLvlInfo.percentage}%
 
-📝 Total de postagens: ${totalPosts}
-📅 Postagens nesta semana: ${weeklyPosts}
+👑 Nível de Engajamento: ${engagementLvlInfo.level} (XP: ${engagementXp} / ${engagementLvlInfo.xpNeededForNext} pts)
+${engagementLvlInfo.progressBar} ${engagementLvlInfo.percentage}%
+
+📝 Postagens: ${totalPosts} (Semana: ${weeklyPosts})
+❤️ Likes recebidos: ${totalLikes}
+📝 Tópicos criados: ${totalTopics}
+💬 Comentários nos seus tópicos: ${totalComments}
 📅 Tempo de casa: ${houseTimeString}
 ⏰ Lembretes pendentes: ${remindersCount}
 
@@ -602,7 +619,14 @@ ${badgesList}`
 
 			const callerTotalPosts = callerMember?.posts?.reduce((acc, curr) => acc + (curr || 0), 0) || 0
 			const callerWeeklyPosts = callerMember?.posts?.[weekNumber] || 0
-			const callerLvlInfo = generalFncs.getLevelInfo(callerTotalPosts)
+
+			const callerLikes = callerMember?.totalLikesReceived || 0
+			const callerTopics = callerMember?.totalTopicsCreated || 0
+			const callerComments = callerMember?.totalCommentsOnTopics || 0
+			const callerEngagementXp = (callerLikes * 10) + (callerTopics * 30) + (callerComments * 5)
+
+			const callerActivityLvl = generalFncs.getLevelInfo(callerTotalPosts * 10)
+			const callerEngagementLvl = generalFncs.getLevelInfo(callerEngagementXp)
 
 			let callerWeeksOfHouse = 0
 			let callerMonthsOfHouse = 0
@@ -634,7 +658,14 @@ ${badgesList}`
 
 			const targetTotalPosts = targetMember?.posts?.reduce((acc, curr) => acc + (curr || 0), 0) || 0
 			const targetWeeklyPosts = targetMember?.posts?.[weekNumber] || 0
-			const targetLvlInfo = generalFncs.getLevelInfo(targetTotalPosts)
+
+			const targetLikes = targetMember?.totalLikesReceived || 0
+			const targetTopics = targetMember?.totalTopicsCreated || 0
+			const targetComments = targetMember?.totalCommentsOnTopics || 0
+			const targetEngagementXp = (targetLikes * 10) + (targetTopics * 30) + (targetComments * 5)
+
+			const targetActivityLvl = generalFncs.getLevelInfo(targetTotalPosts * 10)
+			const targetEngagementLvl = generalFncs.getLevelInfo(targetEngagementXp)
 
 			let targetWeeksOfHouse = 0
 			let targetMonthsOfHouse = 0
@@ -670,16 +701,10 @@ ${badgesList}`
 				return 'Empate 🤝'
 			}
 
-			let levelWinner = 'Empate 🤝'
-			if (callerLvlInfo.level > targetLvlInfo.level) {
-				levelWinner = callerName
-			} else if (targetLvlInfo.level > callerLvlInfo.level) {
-				levelWinner = targetName
-			} else {
-				levelWinner = getWinner(callerLvlInfo.xpProgress, targetLvlInfo.xpProgress, callerName, targetName)
-			}
-
-			const postsWinner = getWinner(callerTotalPosts, targetTotalPosts, callerName, targetName)
+			const activityWinner = getWinner(callerTotalPosts, targetTotalPosts, callerName, targetName)
+			const engagementWinner = getWinner(callerEngagementXp, targetEngagementXp, callerName, targetName)
+			const likesWinner = getWinner(callerLikes, targetLikes, callerName, targetName)
+			const topicsWinner = getWinner(callerTopics, targetTopics, callerName, targetName)
 			const weeklyWinner = getWinner(callerWeeklyPosts, targetWeeklyPosts, callerName, targetName)
 			const houseWinner = getWinner(callerWeeksOfHouse, targetWeeksOfHouse, callerName, targetName)
 			const bolaoWinner = getWinner(callerPoints, targetPoints, callerName, targetName)
@@ -692,20 +717,30 @@ ${badgesList}`
 👤 *Membro A*: [id${userId}|${callerName}]
 👤 *Membro B*: [id${targetUserId}|${targetName}]
 
-⭐ Nível:
-- Membro A: Nível ${callerLvlInfo.level} (XP: ${callerLvlInfo.xpProgress} / ${callerLvlInfo.xpNeededForNext})
-- Membro B: Nível ${targetLvlInfo.level} (XP: ${targetLvlInfo.xpProgress} / ${targetLvlInfo.xpNeededForNext})
-➔ Vencedor: ${levelWinner}
+⚔️ Nível de Atividade:
+- Membro A: Nível ${callerActivityLvl.level} (XP: ${callerActivityLvl.xpProgress / 10} / ${callerActivityLvl.xpNeededForNext / 10} posts)
+- Membro B: Nível ${targetActivityLvl.level} (XP: ${targetActivityLvl.xpProgress / 10} / ${targetActivityLvl.xpNeededForNext / 10} posts)
+➔ Vencedor: ${activityWinner}
+
+👑 Nível de Engajamento:
+- Membro A: Nível ${callerEngagementLvl.level} (XP: ${callerEngagementXp} / ${callerEngagementLvl.xpNeededForNext} pts)
+- Membro B: Nível ${targetEngagementLvl.level} (XP: ${targetEngagementXp} / ${targetEngagementLvl.xpNeededForNext} pts)
+➔ Vencedor: ${engagementWinner}
 
 📝 Total de postagens:
 - Membro A: ${callerTotalPosts} posts
 - Membro B: ${targetTotalPosts} posts
-➔ Vencedor: ${postsWinner}
+➔ Vencedor: ${activityWinner}
 
-📅 Postagens nesta semana:
-- Membro A: ${callerWeeklyPosts} posts
-- Membro B: ${targetWeeklyPosts} posts
-➔ Vencedor: ${weeklyWinner}
+❤️ Likes recebidos:
+- Membro A: ${callerLikes} likes
+- Membro B: ${targetLikes} likes
+➔ Vencedor: ${likesWinner}
+
+📝 Tópicos criados:
+- Membro A: ${callerTopics} tópicos
+- Membro B: ${targetTopics} tópicos
+➔ Vencedor: ${topicsWinner}
 
 📅 Tempo de casa:
 - Membro A: ${callerMonthsOfHouse} meses (${callerWeeksOfHouse} semanas)
@@ -1039,7 +1074,7 @@ Resumo:`
 			const rankingLines = members.map((row, idx) => {
 				const vkUser = vkUsers.find((u: any) => u.id === row.userId)
 				const name = vkUser ? `${vkUser.first_name} ${vkUser.last_name}` : `Membro ${row.userId}`
-				const lvlInfo = generalFncs.getLevelInfo(row.totalPosts)
+				const lvlInfo = generalFncs.getLevelInfo(row.totalPosts * 10)
 				return `${idx + 1}. [id${row.userId}|${name}] - Nível ${lvlInfo.level} (${row.totalPosts} posts)`
 			})
 

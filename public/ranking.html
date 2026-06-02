@@ -479,6 +479,45 @@
 			color: #080d16;
 			box-shadow: 0 4px 15px rgba(0, 242, 254, 0.25);
 		}
+
+		.section-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 1.5rem;
+			flex-wrap: wrap;
+			gap: 1rem;
+		}
+
+		.rpg-mode-selector {
+			display: flex;
+			background: rgba(255, 255, 255, 0.03);
+			border: 1px solid rgba(255, 255, 255, 0.08);
+			border-radius: 8px;
+			padding: 2px;
+		}
+
+		.mode-btn {
+			background: transparent;
+			border: none;
+			color: var(--text-muted);
+			padding: 0.4rem 0.8rem;
+			font-size: 0.85rem;
+			font-family: inherit;
+			border-radius: 6px;
+			cursor: pointer;
+			transition: var(--transition);
+		}
+
+		.mode-btn:hover {
+			color: var(--text-main);
+		}
+
+		.mode-btn.active {
+			background: linear-gradient(135deg, var(--primary), var(--success));
+			color: #080d16;
+			font-weight: 600;
+		}
 	</style>
 </head>
 <body>
@@ -510,6 +549,8 @@
 	<script>
 		let currentPeriod = 'overall';
 		let currentSearch = '';
+		let currentRpgMode = 'activity';
+		let cachedRpgData = [];
 
 		async function loadRanking() {
 			const mainContent = document.getElementById('main-content');
@@ -535,12 +576,18 @@
 				
 				const badgeText = currentSearch ? 'Resultado' : 'Top 50';
 
+				cachedRpgData = data.rpg || [];
+
 				// Renders layout
 				mainContent.innerHTML = `
 					<!-- RPG Section -->
 					<section class="ranking-section">
 						<div class="section-header">
 							<h2 class="section-title">⭐ RPG de Níveis <span class="badge">${badgeText}</span></h2>
+							<div class="rpg-mode-selector">
+								<button class="mode-btn ${currentRpgMode === 'activity' ? 'active' : ''}" id="mode-activity" onclick="switchRpgMode('activity')">Atividade</button>
+								<button class="mode-btn ${currentRpgMode === 'engagement' ? 'active' : ''}" id="mode-engagement" onclick="switchRpgMode('engagement')">Engajamento</button>
+							</div>
 						</div>
 						<div class="list-container" id="rpg-list"></div>
 					</section>
@@ -554,56 +601,8 @@
 					</section>
 				`;
 
-				const rpgList = document.getElementById('rpg-list');
 				const bolaoList = document.getElementById('bolao-list');
-
-				// Populate RPG Ranking
-				if (data.rpg && data.rpg.length > 0) {
-					data.rpg.forEach((member) => {
-						const posClass = member.rank <= 3 ? `pos-${member.rank}` : '';
-						
-						// Render badges dynamically
-						const badgesHTML = member.badges.map(b => {
-							const isSpecial = b.includes('🏆') || b.includes('👑') || b.includes('🚀') || b.includes('💫') || b.includes('🔱') || b.includes('👴');
-							const badgeClass = isSpecial ? 'badge-tag gold-badge' : 'badge-tag';
-							return `<span class="${badgeClass}">${b}</span>`;
-						}).join('');
-
-						rpgList.innerHTML += `
-							<div class="ranking-item ${posClass}">
-								<div class="rank-badge">${member.rank}</div>
-								<div class="avatar-container">
-									<img src="${member.photo}" alt="${member.name}" class="avatar">
-								</div>
-								<div class="user-info">
-									<a href="https://vk.com/id${member.userId}" target="_blank" class="user-name">${member.name}</a>
-									<div class="user-meta">
-										<div class="meta-item">Nível <strong>${member.level}</strong></div>
-										<div class="meta-item">Casa: <strong>${member.houseTime}</strong></div>
-									</div>
-									<div class="rpg-progress">
-										<div class="progress-track">
-											<div class="progress-bar" style="width: ${member.percentage}%"></div>
-										</div>
-										<div class="progress-text">
-											<span>XP: ${member.progressBar}</span>
-											<span>${member.percentage}%</span>
-										</div>
-									</div>
-									<div class="badges-wrap">
-										${badgesHTML}
-									</div>
-								</div>
-								<div class="score-box">
-									<div class="score-val">${member.totalPosts}</div>
-									<div class="score-label">posts</div>
-								</div>
-							</div>
-						`;
-					});
-				} else {
-					rpgList.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem;">Nenhum membro encontrado no RPG.</p>';
-				}
+				renderRpgList(cachedRpgData);
 
 				// Populate Bolão Ranking
 				if (data.bolao && data.bolao.length > 0) {
@@ -641,6 +640,112 @@
 					</div>
 				`;
 			}
+		}
+
+		function switchRpgMode(mode) {
+			if (currentRpgMode === mode) return;
+			currentRpgMode = mode;
+			
+			document.getElementById('mode-activity').classList.toggle('active', mode === 'activity');
+			document.getElementById('mode-engagement').classList.toggle('active', mode === 'engagement');
+			
+			renderRpgList(cachedRpgData);
+		}
+
+		function renderRpgList(members) {
+			const rpgList = document.getElementById('rpg-list');
+			if (!rpgList) return;
+			rpgList.innerHTML = '';
+
+			if (!members || members.length === 0) {
+				rpgList.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem;">Nenhum membro encontrado no RPG.</p>';
+				return;
+			}
+
+			// Sort based on mode
+			const sorted = [...members];
+			if (currentRpgMode === 'activity') {
+				sorted.sort((a, b) => b.totalPosts - a.totalPosts);
+			} else {
+				sorted.sort((a, b) => b.engagementXp - a.engagementXp);
+			}
+
+			sorted.forEach((member, index) => {
+				const rank = index + 1;
+				const posClass = rank <= 3 ? `pos-${rank}` : '';
+				
+				const badgesHTML = member.badges.map(b => {
+					const isSpecial = b.includes('🏆') || b.includes('👑') || b.includes('🚀') || b.includes('💫') || b.includes('🔱') || b.includes('👴');
+					const badgeClass = isSpecial ? 'badge-tag gold-badge' : 'badge-tag';
+					return `<span class="${badgeClass}">${b}</span>`;
+				}).join('');
+
+				if (currentRpgMode === 'activity') {
+					rpgList.innerHTML += `
+						<div class="ranking-item ${posClass}">
+							<div class="rank-badge">${rank}</div>
+							<div class="avatar-container">
+								<img src="${member.photo}" alt="${member.name}" class="avatar">
+							</div>
+							<div class="user-info">
+								<a href="https://vk.com/id${member.userId}" target="_blank" class="user-name">${member.name}</a>
+								<div class="user-meta">
+									<div class="meta-item">Nível Atividade: <strong>${member.level}</strong></div>
+									<div class="meta-item">Casa: <strong>${member.houseTime}</strong></div>
+								</div>
+								<div class="rpg-progress">
+									<div class="progress-track">
+										<div class="progress-bar" style="width: ${member.percentage}%"></div>
+									</div>
+									<div class="progress-text">
+										<span>XP: ${member.progressBar}</span>
+										<span>${member.percentage}%</span>
+									</div>
+								</div>
+								<div class="badges-wrap">
+									${badgesHTML}
+								</div>
+							</div>
+							<div class="score-box">
+								<div class="score-val">${member.totalPosts}</div>
+								<div class="score-label">posts</div>
+							</div>
+						</div>
+					`;
+				} else {
+					rpgList.innerHTML += `
+						<div class="ranking-item ${posClass}">
+							<div class="rank-badge">${rank}</div>
+							<div class="avatar-container">
+								<img src="${member.photo}" alt="${member.name}" class="avatar">
+							</div>
+							<div class="user-info">
+								<a href="https://vk.com/id${member.userId}" target="_blank" class="user-name">${member.name}</a>
+								<div class="user-meta">
+									<div class="meta-item">Nível Engajamento: <strong>${member.engagementLevel}</strong></div>
+									<div class="meta-item">❤️ <strong>${member.totalLikes}</strong> likes | 📝 <strong>${member.totalTopics}</strong> tópicos | 💬 <strong>${member.totalComments}</strong> comt.</div>
+								</div>
+								<div class="rpg-progress">
+									<div class="progress-track">
+										<div class="progress-bar" style="width: ${member.engagementPercentage}%"></div>
+									</div>
+									<div class="progress-text">
+										<span>XP: ${member.engagementProgressBar}</span>
+										<span>${member.engagementPercentage}%</span>
+									</div>
+								</div>
+								<div class="badges-wrap">
+									${badgesHTML}
+								</div>
+							</div>
+							<div class="score-box engagement-score" style="background: rgba(0, 242, 254, 0.1); border: 1px solid rgba(0, 242, 254, 0.25);">
+								<div class="score-val" style="color: var(--primary); text-shadow: 0 0 10px rgba(0, 242, 254, 0.3);">${member.engagementXp}</div>
+								<div class="score-label">XP pts</div>
+							</div>
+						</div>
+					`;
+				}
+			});
 		}
 
 		// Event Listeners

@@ -10,6 +10,7 @@ swap_size_mb = 512
 
 [env]
   PORT = "8080"
+  RUN_FULL_BACKFILL = "false"
 
 [[services]]
   internal_port = 8080

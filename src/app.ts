@@ -143,7 +143,7 @@ app.get('/api/ranking', async (request, response) => {
 			const totalLikes = m.totalLikesReceived || 0
 			const totalTopics = m.totalTopicsCreated || 0
 			const totalComments = m.totalCommentsOnTopics || 0
-			const engagementXp = (totalLikes * 10) + (totalTopics * 30) + (totalComments * 5)
+			const engagementXp = (totalLikes * 10) + (totalTopics * 5) + (totalComments * 10)
 			const generalXp = (m.totalPosts * 10) + engagementXp
 			return {
 				member: m,

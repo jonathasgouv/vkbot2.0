@@ -549,7 +549,7 @@ export default {
 		// Formulas:
 		// Activity XP = Posts * 10
 		// Engagement XP = (Likes * 10) + (Topics * 30) + (Comments * 5)
-		const engagementXp = (totalLikes * 10) + (totalTopics * 30) + (totalComments * 5)
+		const engagementXp = (totalLikes * 10) + (totalTopics * 5) + (totalComments * 10)
 
 		const activityLvlInfo = generalFncs.getLevelInfo(totalPosts * 10)
 		const engagementLvlInfo = generalFncs.getLevelInfo(engagementXp)
@@ -655,7 +655,7 @@ ${badgesList}`
 			const callerLikes = callerMember?.totalLikesReceived || 0
 			const callerTopics = callerMember?.totalTopicsCreated || 0
 			const callerComments = callerMember?.totalCommentsOnTopics || 0
-			const callerEngagementXp = (callerLikes * 10) + (callerTopics * 30) + (callerComments * 5)
+			const callerEngagementXp = (callerLikes * 10) + (callerTopics * 5) + (callerComments * 10)
 
 			const callerActivityLvl = generalFncs.getLevelInfo(callerTotalPosts * 10)
 			const callerEngagementLvl = generalFncs.getLevelInfo(callerEngagementXp)
@@ -694,7 +694,7 @@ ${badgesList}`
 			const targetLikes = targetMember?.totalLikesReceived || 0
 			const targetTopics = targetMember?.totalTopicsCreated || 0
 			const targetComments = targetMember?.totalCommentsOnTopics || 0
-			const targetEngagementXp = (targetLikes * 10) + (targetTopics * 30) + (targetComments * 5)
+			const targetEngagementXp = (targetLikes * 10) + (targetTopics * 5) + (targetComments * 10)
 
 			const targetActivityLvl = generalFncs.getLevelInfo(targetTotalPosts * 10)
 			const targetEngagementLvl = generalFncs.getLevelInfo(targetEngagementXp)
@@ -1092,8 +1092,8 @@ Resumo:`
 					engagementXp: {
 						$add: [
 							{ $multiply: [{ $ifNull: ['$totalLikesReceived', 0] }, 10] },
-							{ $multiply: [{ $ifNull: ['$totalTopicsCreated', 0] }, 30] },
-							{ $multiply: [{ $ifNull: ['$totalCommentsOnTopics', 0] }, 5] }
+							{ $multiply: [{ $ifNull: ['$totalTopicsCreated', 0] }, 5] },
+							{ $multiply: [{ $ifNull: ['$totalCommentsOnTopics', 0] }, 10] }
 						]
 					}
 				} },

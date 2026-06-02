@@ -21,4 +21,17 @@ vkInstance.interceptors.request.use(
 	}
 )
 
+vkInstance.interceptors.response.use(
+	(response) => {
+		if (response.data && response.data.error) {
+			console.error('VK API Error:', response.config.url, response.data.error)
+		}
+		return response
+	},
+	(error) => {
+		console.error('VK HTTP Error:', error.message)
+		return Promise.reject(error)
+	}
+)
+
 export default vkInstance

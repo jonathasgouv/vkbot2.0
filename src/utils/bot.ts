@@ -106,28 +106,54 @@ export default {
 	},
 
 	async getLastTopics(count: number, cmm: number): Promise<ITopic[]> {
-		const topicsResponse = await vkApi.board.getTopics({
-			groupId: cmm,
-			order: 1,
-			count,
-			preview: 1,
-			previewLength: 0,
-		})
+		const allTopics: ITopic[] = []
+		let offset = 0
+		let hasMore = true
 
-		const topics: ITopic[] = topicsResponse.items.map((item) => {
-			return {
-				cmmId: cmm,
-				_id: item.id,
-				title: item.title,
-				first_comment: item.first_comment,
-				created_by: item.created_by,
-				is_fixed: item.is_fixed,
-				createdAt: new Date(item.created * 1000),
-				commentsCount: item.comments,
+		while (allTopics.length < count && hasMore) {
+			const limit = Math.min(100, count - allTopics.length)
+			try {
+				const topicsResponse = await vkApi.board.getTopics({
+					groupId: cmm,
+					order: 1,
+					count: limit,
+					offset,
+					preview: 1,
+					previewLength: 0,
+				})
+
+				if (!topicsResponse || !topicsResponse.items || topicsResponse.items.length === 0) {
+					hasMore = false
+					break
+				}
+
+				const topics: ITopic[] = topicsResponse.items.map((item) => ({
+					cmmId: cmm,
+					_id: item.id,
+					title: item.title,
+					first_comment: item.first_comment,
+					created_by: item.created_by,
+					is_fixed: item.is_fixed,
+					createdAt: new Date(item.created * 1000),
+					commentsCount: item.comments,
+				}))
+
+				allTopics.push(...topics)
+
+				if (topicsResponse.items.length < limit) {
+					hasMore = false
+				} else {
+					offset += topicsResponse.items.length
+					// Rate limit safeguard
+					await new Promise((resolve) => setTimeout(resolve, 100))
+				}
+			} catch (err) {
+				console.error('Erro ao buscar página de tópicos:', err)
+				hasMore = false
 			}
-		})
+		}
 
-		return topics
+		return allTopics
 	},
 
 	async getTopicTitle(cmmId: number, topicId: number): Promise<string> {

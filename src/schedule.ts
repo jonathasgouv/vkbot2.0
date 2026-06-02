@@ -17,7 +17,7 @@ cron.schedule('*/10 * * * *', topics.saveTopics, {
 	scheduled: true,
 	timezone: 'America/Sao_Paulo',
 })
-cron.schedule('0 */5 * * *', comments.syncCommentsAndLikes, {
+cron.schedule('0 */3 * * *', comments.syncCommentsAndLikes, {
 	scheduled: true,
 	timezone: 'America/Sao_Paulo',
 })

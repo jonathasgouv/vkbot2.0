@@ -10,14 +10,21 @@ export default {
 			const cmms = await Member.distinct('cmmId')
 
 			for (const cmmId of cmms) {
-				// Fetch topics: 5000 for full backfill, 100 for routine sync
-				const topicsCount = isFullBackfill ? 5000 : 100
+				// Fetch topics: 1000 for full backfill, 50 for routine sync
+				const topicsCount = isFullBackfill ? 1000 : 50
 				const activeTopics = await bot.getLastTopics(topicsCount, cmmId)
 				if (!activeTopics || activeTopics.length === 0) continue
 
 				for (const topic of activeTopics) {
 					const topicId = topic._id
+					// For routine sync, limit comment fetching to the latest 200 comments
 					let offset = 0
+					if (!isFullBackfill) {
+						const maxCommentsToSync = 200
+						if (topic.commentsCount && topic.commentsCount > maxCommentsToSync) {
+							offset = Math.floor((topic.commentsCount - maxCommentsToSync) / 100) * 100
+						}
+					}
 					let hasMore = true
 					const allCommentsToSave = []
 

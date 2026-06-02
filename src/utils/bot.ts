@@ -533,8 +533,39 @@ export default {
 		const userTag = await this.getTagString(userId)
 
 		// 2. Buscar dados do membro na comunidade no banco
-		const member = await Member.findOne({ cmmId, userId })
-		
+		let member = await Member.findOne({ cmmId, userId })
+		if (!member) {
+			try {
+				member = await Member.create({ cmmId, userId, posts: [] })
+			} catch (err) {
+				console.error('Error creating member in sendProfile:', err)
+			}
+		}
+
+		// Cooldown check (24 hours)
+		if (member?.lastProfileCommandAt) {
+			const timePassed = Date.now() - member.lastProfileCommandAt.getTime()
+			const cooldownMs = 24 * 60 * 60 * 1000
+			if (timePassed < cooldownMs) {
+				const timeRemaining = cooldownMs - timePassed
+				const hours = Math.floor(timeRemaining / (60 * 60 * 1000))
+				const minutes = Math.floor((timeRemaining % (60 * 60 * 1000)) / (60 * 1000))
+				const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
+				const responseText = `${quote} ⚠️ Você já solicitou seu perfil hoje. Tente novamente em ${hours}h ${minutes}m.`
+				isMessage
+					? await vkApi.messages.send({ peerId: userId, message: responseText })
+					: await vkApi.board.createComment({ topicId, cmmId, text: responseText })
+				return
+			}
+		}
+
+		// Update cooldown timestamp
+		try {
+			await Member.updateOne({ cmmId, userId }, { $set: { lastProfileCommandAt: new Date() } })
+		} catch (err) {
+			console.error('Error updating profile cooldown in sendProfile:', err)
+		}
+
 		const totalPosts = member?.posts?.reduce((acc, curr) => acc + (curr || 0), 0) || 0
 		
 		const initialDate = process.env.INITIAL_DATE ? new Date(process.env.INITIAL_DATE) : new Date()
@@ -1078,6 +1109,38 @@ Resumo:`
 		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
 
 		try {
+			let member = await Member.findOne({ cmmId, userId })
+			if (!member) {
+				try {
+					member = await Member.create({ cmmId, userId, posts: [] })
+				} catch (err) {
+					console.error('Error creating member in sendRpgRanking:', err)
+				}
+			}
+
+			// Cooldown check (24 hours)
+			if (member?.lastRankingCommandAt) {
+				const timePassed = Date.now() - member.lastRankingCommandAt.getTime()
+				const cooldownMs = 24 * 60 * 60 * 1000
+				if (timePassed < cooldownMs) {
+					const timeRemaining = cooldownMs - timePassed
+					const hours = Math.floor(timeRemaining / (60 * 60 * 1000))
+					const minutes = Math.floor((timeRemaining % (60 * 60 * 1000)) / (60 * 1000))
+					const responseText = `${quote} ⚠️ Você já solicitou o ranking hoje. Tente novamente em ${hours}h ${minutes}m.`
+					isMessage
+						? await vkApi.messages.send({ peerId: userId, message: responseText })
+						: await vkApi.board.createComment({ topicId, cmmId, text: responseText })
+					return
+				}
+			}
+
+			// Update cooldown timestamp
+			try {
+				await Member.updateOne({ cmmId, userId }, { $set: { lastRankingCommandAt: new Date() } })
+			} catch (err) {
+				console.error('Error updating ranking cooldown in sendRpgRanking:', err)
+			}
+
 			const botId = parseInt(process.env.BOT_ID || process.env.VK_BOT_ID || '0')
 			const members = await Member.aggregate([
 				{ $match: { cmmId, userId: { $ne: botId } } },

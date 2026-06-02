@@ -32,6 +32,14 @@ const MembersSchema = new mongoose.Schema<IMembers>(
 			type: 'number',
 			default: 0,
 		},
+		lastProfileCommandAt: {
+			type: 'date',
+			required: false,
+		},
+		lastRankingCommandAt: {
+			type: 'date',
+			required: false,
+		},
 	},
 	{ collection: 'members' }
 )

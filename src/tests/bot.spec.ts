@@ -340,7 +340,70 @@ describe('bot.ts utility functions', () => {
 					message: expect.stringContaining('Nível de Atividade: 1'),
 				})
 			)
-			expect(mockCreateComment).not.toHaveBeenCalled()
+		})
+
+		test('should block profile command if lastProfileCommandAt is less than 24 hours ago', async () => {
+			const recentDate = new Date(Date.now() - 2 * 60 * 60 * 1000) // 2 hours ago
+			mockFindOneMember.mockResolvedValue({
+				userId: 300,
+				cmmId: 100,
+				posts: [50, 100, 150],
+				lastProfileCommandAt: recentDate,
+			})
+			mockGetUsers.mockResolvedValue([{ first_name: 'John', last_name: 'Doe' }])
+
+			await bot.sendProfile({
+				userId: 300,
+				cmmId: 100,
+				topicId: 200,
+				postId: 400,
+				message: '!perfil',
+			})
+
+			expect(mockCreateComment).toHaveBeenCalledWith(
+				expect.objectContaining({
+					cmmId: 100,
+					topicId: 200,
+					text: expect.stringContaining('Você já solicitou seu perfil hoje. Tente novamente em'),
+				})
+			)
+			expect(mockUpdateOneMember).not.toHaveBeenCalled()
+		})
+
+		test('should proceed with profile command if lastProfileCommandAt is more than 24 hours ago', async () => {
+			const oldDate = new Date(Date.now() - 25 * 60 * 60 * 1000) // 25 hours ago
+			mockFindOneMember.mockResolvedValue({
+				userId: 300,
+				cmmId: 100,
+				posts: [50, 100, 150],
+				lastProfileCommandAt: oldDate,
+			})
+			mockCountDocuments.mockResolvedValue(0)
+			mockGetUsers.mockResolvedValue([{ first_name: 'John', last_name: 'Doe' }])
+
+			await bot.sendProfile({
+				userId: 300,
+				cmmId: 100,
+				topicId: 200,
+				postId: 400,
+				message: '!perfil',
+			})
+
+			expect(mockCreateComment).toHaveBeenCalledWith(
+				expect.objectContaining({
+					cmmId: 100,
+					topicId: 200,
+					text: expect.stringContaining('estatísticas na comunidade de [id300|John Doe]:'),
+				})
+			)
+			expect(mockUpdateOneMember).toHaveBeenCalledWith(
+				{ cmmId: 100, userId: 300 },
+				expect.objectContaining({
+					$set: expect.objectContaining({
+						lastProfileCommandAt: expect.any(Date),
+					}),
+				})
+			)
 		})
 	})
 

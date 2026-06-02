@@ -6,4 +6,6 @@ export default interface IMember {
 	totalLikesReceived?: number
 	totalTopicsCreated?: number
 	totalCommentsOnTopics?: number
+	lastProfileCommandAt?: Date
+	lastRankingCommandAt?: Date
 }

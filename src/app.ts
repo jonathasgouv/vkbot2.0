@@ -344,13 +344,12 @@ app.get('/', (request, response) => {
 
 if (process.env.NODE_ENV !== 'test') {
 	mongoose.connection.once('open', () => {
-		const isFullBackfill = process.env.RUN_FULL_BACKFILL === 'true'
-		console.info(`Database connected. Triggering startup sync (Full Backfill: ${isFullBackfill})`)
+		console.info('Database connected. Triggering startup sync')
 		import('@crons/topics')
 			.then((m) => m.default.saveTopics())
 			.catch((err) => console.error('Error in startup topics sync:', err))
 		import('@crons/comments')
-			.then((m) => m.default.syncCommentsAndLikes(isFullBackfill))
+			.then((m) => m.default.syncCommentsAndLikes())
 			.catch((err) => console.error('Error in startup comments sync:', err))
 	})
 }

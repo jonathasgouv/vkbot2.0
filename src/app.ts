@@ -335,4 +335,16 @@ app.get('/', (request, response) => {
 	return response.send('bip bop')
 })
 
+if (process.env.NODE_ENV !== 'test') {
+	mongoose.connection.once('open', () => {
+		console.info('Database connected. Triggering one-off startup sync for topics and comments...')
+		import('@crons/topics')
+			.then((m) => m.default.saveTopics())
+			.catch((err) => console.error('Error in startup topics sync:', err))
+		import('@crons/comments')
+			.then((m) => m.default.syncCommentsAndLikes())
+			.catch((err) => console.error('Error in startup comments sync:', err))
+	})
+}
+
 export default app

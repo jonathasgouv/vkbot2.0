@@ -68,11 +68,15 @@ jest.mock('@models/Bet', () => {
 })
 
 const mockDistinctMembers = jest.fn()
+const mockFindMembers = jest.fn().mockResolvedValue([])
+const mockUpdateManyMembers = jest.fn().mockResolvedValue({})
 jest.mock('@models/Member', () => {
 	return {
 		__esModule: true,
 		default: {
 			distinct: mockDistinctMembers,
+			find: mockFindMembers,
+			updateMany: mockUpdateManyMembers,
 		},
 	}
 })

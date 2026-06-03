@@ -4,6 +4,7 @@ import members from '@crons/members'
 import topics from '@crons/topics'
 import bolao from '@crons/bolao'
 import comments from '@crons/comments'
+import copa from '@crons/copa'
 
 cron.schedule('* * * * *', () => reminder.sendResponses(), {
 	scheduled: true,
@@ -26,6 +27,14 @@ cron.schedule('0 2 * * *', () => bolao.checkAndCreateNextRound(), {
 	timezone: 'America/Sao_Paulo',
 })
 cron.schedule('0 * * * *', () => bolao.resolveRoundBets(), {
+	scheduled: true,
+	timezone: 'America/Sao_Paulo',
+})
+cron.schedule('15 2 * * *', () => copa.checkAndCreateNextCopaRound(), {
+	scheduled: true,
+	timezone: 'America/Sao_Paulo',
+})
+cron.schedule('30 * * * *', () => copa.resolveCopaRoundBets(), {
 	scheduled: true,
 	timezone: 'America/Sao_Paulo',
 })

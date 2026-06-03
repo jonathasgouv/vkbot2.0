@@ -550,6 +550,7 @@
 		let currentPeriod = 'overall';
 		let currentSearch = '';
 		let currentRpgMode = 'activity';
+		let currentChampionship = 'brasileirao';
 		let cachedRpgData = [];
 
 		async function loadRanking() {
@@ -568,7 +569,7 @@
 				const urlParams = new URLSearchParams(window.location.search);
 				const cmmId = urlParams.get('cmmId') || '';
 				
-				const fetchUrl = `/api/ranking?cmmId=${cmmId}&period=${currentPeriod}&search=${encodeURIComponent(currentSearch)}&type=${currentRpgMode}`;
+				const fetchUrl = `/api/ranking?cmmId=${cmmId}&period=${currentPeriod}&search=${encodeURIComponent(currentSearch)}&type=${currentRpgMode}&championship=${currentChampionship}`;
 				const response = await fetch(fetchUrl);
 				if (!response.ok) throw new Error('Falha ao obter o ranking');
 				
@@ -596,7 +597,11 @@
 					<!-- Bolão Section -->
 					<section class="ranking-section">
 						<div class="section-header">
-							<h2 class="section-title">🏆 Bolão do Cartola <span class="badge">${badgeText}</span></h2>
+							<h2 class="section-title">🏆 Bolão <span class="badge">${badgeText}</span></h2>
+							<div class="rpg-mode-selector">
+								<button class="mode-btn ${currentChampionship === 'brasileirao' ? 'active' : ''}" id="champ-brasileirao" onclick="switchChampionship('brasileirao')">Brasileirão</button>
+								<button class="mode-btn ${currentChampionship === 'copa' ? 'active' : ''}" id="champ-copa" onclick="switchChampionship('copa')">Copa 2026</button>
+							</div>
 						</div>
 						<div class="list-container" id="bolao-list"></div>
 					</section>
@@ -650,6 +655,16 @@
 			document.getElementById('mode-activity').classList.toggle('active', mode === 'activity');
 			document.getElementById('mode-engagement').classList.toggle('active', mode === 'engagement');
 			document.getElementById('mode-general').classList.toggle('active', mode === 'general');
+			
+			loadRanking();
+		}
+
+		function switchChampionship(champ) {
+			if (currentChampionship === champ) return;
+			currentChampionship = champ;
+			
+			document.getElementById('champ-brasileirao').classList.toggle('active', champ === 'brasileirao');
+			document.getElementById('champ-copa').classList.toggle('active', champ === 'copa');
 			
 			loadRanking();
 		}

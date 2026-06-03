@@ -4,11 +4,35 @@ import bot from '@utils/bot'
 import IMember from '@appTypes/member'
 
 const getMostPostsText = async (members: IMember[]): Promise<string> => {
-	const membersNamePromises = members.map(async (member) => {
-		return bot.getTagString(member.userId)
-	})
+	const missingIds = members
+		.filter((m) => !m.firstName)
+		.map((m) => m.userId)
 
-	const membersNameResults = await Promise.all(membersNamePromises)
+	let vkUsers: any[] = []
+	if (missingIds.length > 0) {
+		try {
+			vkUsers = (await vkApi.users.get({ userIds: missingIds })) || []
+			for (const u of vkUsers) {
+				Member.updateMany(
+					{ userId: u.id },
+					{ $set: { firstName: u.first_name, lastName: u.last_name } }
+				).catch(() => {})
+			}
+		} catch (err) {
+			console.error('Erro ao buscar usuários do VK para cron de posts:', err)
+		}
+	}
+
+	const membersNameResults = members.map((member) => {
+		const vkUser = vkUsers.find((u) => u.id === member.userId)
+		if (vkUser) {
+			return `[id${member.userId}|${vkUser.first_name} ${vkUser.last_name}]`
+		}
+		if (member.firstName) {
+			return `[id${member.userId}|${member.firstName} ${member.lastName || ''}]`
+		}
+		return `[id${member.userId}|Membro]`
+	})
 
 	const topMembersResults = members
 		.map((member, index) => `${index + 1}º lugar - ${membersNameResults[index]}, com ${member.posts.slice(-1)[0]} posts.`)

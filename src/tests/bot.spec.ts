@@ -70,6 +70,8 @@ jest.mock('axios', () => {
 const mockFindOneMember = jest.fn()
 const mockUpdateOneMember = jest.fn()
 const mockCreateMember = jest.fn()
+const mockFindMembers = jest.fn().mockResolvedValue([])
+const mockUpdateManyMembers = jest.fn().mockResolvedValue({})
 jest.mock('@models/Member', () => {
 	return {
 		__esModule: true,
@@ -77,6 +79,8 @@ jest.mock('@models/Member', () => {
 			findOne: mockFindOneMember,
 			updateOne: mockUpdateOneMember,
 			create: mockCreateMember,
+			find: mockFindMembers,
+			updateMany: mockUpdateManyMembers,
 		}
 	}
 })
@@ -556,7 +560,7 @@ describe('bot.ts utility functions', () => {
 
 		test('should fetch comments, call Gemini, and post summary', async () => {
 			mockGetComments.mockResolvedValue({
-				count: 2,
+				count: 102,
 				items: [
 					{ id: 1, from_id: 301, text: 'Gostei da escalação do Hulk!' },
 					{ id: 2, from_id: 302, text: 'Acho melhor ir de Arrascaeta.' },
@@ -609,7 +613,7 @@ describe('bot.ts utility functions', () => {
 
 		test('should enforce 1h cooldown for normal users', async () => {
 			mockGetComments.mockResolvedValue({
-				count: 1,
+				count: 101,
 				items: [{ id: 1, from_id: 301, text: 'Comentário teste.' }]
 			})
 
@@ -646,7 +650,7 @@ describe('bot.ts utility functions', () => {
 
 		test('should bypass cooldown for moderators', async () => {
 			mockGetComments.mockResolvedValue({
-				count: 1,
+				count: 101,
 				items: [{ id: 1, from_id: 301, text: 'Comentário teste.' }]
 			})
 
@@ -676,6 +680,29 @@ describe('bot.ts utility functions', () => {
 			expect(mockCreateComment).toHaveBeenLastCalledWith(
 				expect.objectContaining({
 					text: expect.stringContaining('Resumo mockado de IA.'),
+				})
+			)
+		})
+
+		test('should fail if topic has less than 100 comments', async () => {
+			mockGetComments.mockResolvedValue({
+				count: 99,
+				items: [{ id: 1, from_id: 301, text: 'Comentário.' }]
+			})
+
+			await bot.sendTopicSummary({
+				userId: 300,
+				cmmId: 100,
+				topicId: 777,
+				postId: 400,
+				message: '!resumo',
+			})
+
+			expect(mockCreateComment).toHaveBeenCalledWith(
+				expect.objectContaining({
+					cmmId: 100,
+					topicId: 777,
+					text: expect.stringContaining('só pode ser utilizado em tópicos com pelo menos 100 comentários'),
 				})
 			)
 		})

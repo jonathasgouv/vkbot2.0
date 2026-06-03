@@ -17,25 +17,53 @@ const resumoCooldowns = new Map<string, number>()
 export default {
 	async getQuoteString(postId: number, userId: number): Promise<string> {
 		try {
+			const cachedMember = await Member.findOne({ userId })
+			if (cachedMember && cachedMember.firstName) {
+				return `[post${postId}|${cachedMember.firstName}],`
+			}
+
 			const userData = await vkApi.users.get({ userIds: [userId] })
 			const firstName = userData?.[0]?.first_name || 'Membro'
+			if (userData?.[0]) {
+				await Member.updateMany(
+					{ userId },
+					{ $set: { firstName: userData[0].first_name, lastName: userData[0].last_name } }
+				).catch(() => {})
+			}
 			return `[post${postId}|${firstName}],`
 		} catch (error) {
 			console.error(`Erro ao obter dados do usuário para quote (${userId}):`, error)
+			const cachedMember = await Member.findOne({ userId }).catch(() => null)
+			if (cachedMember && cachedMember.firstName) {
+				return `[post${postId}|${cachedMember.firstName}],`
+			}
 			return `[post${postId}|Membro],`
 		}
 	},
 
 	async getTagString(userId: number): Promise<string> {
 		try {
+			const cachedMember = await Member.findOne({ userId })
+			if (cachedMember && cachedMember.firstName) {
+				return `[id${userId}|${cachedMember.firstName} ${cachedMember.lastName || ''}]`
+			}
+
 			const userData = await vkApi.users.get({ userIds: [userId] })
 			if (userData?.[0]) {
 				const { first_name, last_name } = userData[0]
+				await Member.updateMany(
+					{ userId },
+					{ $set: { firstName: first_name, lastName: last_name } }
+				).catch(() => {})
 				return `[id${userId}|${first_name} ${last_name}]`
 			}
 			return `[id${userId}|Membro]`
 		} catch (error) {
 			console.error(`Erro ao obter dados do usuário para tag (${userId}):`, error)
+			const cachedMember = await Member.findOne({ userId }).catch(() => null)
+			if (cachedMember && cachedMember.firstName) {
+				return `[id${userId}|${cachedMember.firstName} ${cachedMember.lastName || ''}]`
+			}
 			return `[id${userId}|Membro]`
 		}
 	},
@@ -288,6 +316,7 @@ export default {
 			monitorar: this.monitorarKeyword,
 			desmonitorar: this.desmonitorarKeyword,
 			monitorados: this.listarKeywords,
+			rankingcopa: this.sendCopaRanking,
 		}
 
 		// Shorthand versions of commands
@@ -309,6 +338,8 @@ export default {
 			mon: 'monitorar',
 			dmon: 'desmonitorar',
 			mons: 'monitorados',
+			rkcopa: 'rankingcopa',
+			rkc: 'rankingcopa',
 		}
 
 		// If it is a shorthand transpiles it to complete version
@@ -667,15 +698,33 @@ ${badgesList}`
 		}
 
 		try {
-			const vkUsers = await vkApi.users.get({ userIds: [userId, targetUserId] })
-			const callerUser = vkUsers.find((u: any) => u.id === userId)
-			const targetUser = vkUsers.find((u: any) => u.id === targetUserId)
-
-			const callerName = callerUser ? `${callerUser.first_name} ${callerUser.last_name}` : `Membro ${userId}`
-			const targetName = targetUser ? `${targetUser.first_name} ${targetUser.last_name}` : `Membro ${targetUserId}`
-
 			const callerMember = await Member.findOne({ cmmId, userId })
 			const targetMember = await Member.findOne({ cmmId, userId: targetUserId })
+
+			let callerName = callerMember?.firstName ? `${callerMember.firstName} ${callerMember.lastName || ''}`.trim() : ''
+			let targetName = targetMember?.firstName ? `${targetMember.firstName} ${targetMember.lastName || ''}`.trim() : ''
+
+			if (!callerName || !targetName) {
+				try {
+					const vkUsers = (await vkApi.users.get({ userIds: [userId, targetUserId] })) || []
+					const callerUser = vkUsers.find((u: any) => u.id === userId)
+					const targetUser = vkUsers.find((u: any) => u.id === targetUserId)
+
+					if (callerUser && !callerName) {
+						callerName = `${callerUser.first_name} ${callerUser.last_name}`
+						await Member.updateMany({ userId }, { $set: { firstName: callerUser.first_name, lastName: callerUser.last_name } }).catch(() => {})
+					}
+					if (targetUser && !targetName) {
+						targetName = `${targetUser.first_name} ${targetUser.last_name}`
+						await Member.updateMany({ userId: targetUserId }, { $set: { firstName: targetUser.first_name, lastName: targetUser.last_name } }).catch(() => {})
+					}
+				} catch (err) {
+					console.error('Erro ao buscar usuários do VK em sendComparison:', err)
+				}
+			}
+
+			if (!callerName) callerName = `Membro ${userId}`
+			if (!targetName) targetName = `Membro ${targetUserId}`
 
 			const initialDate = process.env.INITIAL_DATE ? new Date(process.env.INITIAL_DATE) : new Date()
 			const weekNumber = generalFncs.weeksBetween(initialDate, new Date())
@@ -882,8 +931,16 @@ ${badgesList}`
 				return
 			}
 
-			let allComments = [...firstCommentsResponse.items]
 			const totalCount = firstCommentsResponse.count || 0
+			if (totalCount < 100) {
+				const responseText = `${quote} ⚠️ O comando !resumo só pode ser utilizado em tópicos com pelo menos 100 comentários.`
+				isMessage
+					? await vkApi.messages.send({ peerId: userId, message: responseText })
+					: await vkApi.board.createComment({ topicId, cmmId, text: responseText })
+				return
+			}
+
+			let allComments = [...firstCommentsResponse.items]
 
 			// 4. Se houver mais de 50 comentários, buscar os últimos 50
 			if (totalCount > 50) {
@@ -923,10 +980,24 @@ ${badgesList}`
 
 			// 7. Obter nomes reais dos usuários em lote
 			const senderIds = Array.from(new Set(filteredComments.map((c) => c.from_id).filter((id) => id > 0)))
+			const cachedMembers = await Member.find({ userId: { $in: senderIds } })
+			const cachedMap = new Map(cachedMembers.map(m => [m.userId, m]))
+
+			const missingIds = senderIds.filter(id => {
+				const cached = cachedMap.get(id)
+				return !cached || !cached.firstName
+			})
+
 			let vkUsers: any[] = []
-			if (senderIds.length > 0) {
+			if (missingIds.length > 0) {
 				try {
-					vkUsers = await vkApi.users.get({ userIds: senderIds })
+					vkUsers = (await vkApi.users.get({ userIds: missingIds })) || []
+					for (const u of vkUsers) {
+						Member.updateMany(
+							{ userId: u.id },
+							{ $set: { firstName: u.first_name, lastName: u.last_name } }
+						).catch(() => {})
+					}
 				} catch (err) {
 					console.error('Erro ao buscar usuários do VK em lote:', err)
 				}
@@ -936,7 +1007,13 @@ ${badgesList}`
 			const formattedMessages = filteredComments
 				.map((c) => {
 					const vkUser = vkUsers.find((u) => u.id === c.from_id)
-					const name = vkUser ? `${vkUser.first_name} ${vkUser.last_name}` : `Membro ${c.from_id}`
+					let name = ''
+					if (vkUser) {
+						name = `${vkUser.first_name} ${vkUser.last_name}`
+					} else {
+						const cached = cachedMap.get(c.from_id)
+						name = cached?.firstName ? `${cached.firstName} ${cached.lastName || ''}`.trim() : `Membro ${c.from_id}`
+					}
 					return `[${name}]: ${c.text}`
 				})
 				.join('\n')
@@ -1063,14 +1140,23 @@ Resumo:`
 
 	async sendRanking(data: ICommandsInput): Promise<void> {
 		const { topicId, cmmId, postId, userId, message } = data
+		const isCopa = message.toLowerCase().includes('copa') || message.toLowerCase().includes('c ') || message.toLowerCase().endsWith(' c')
+		if (isCopa) {
+			return this.sendCopaRanking(data)
+		}
 		const params = this.getCommandParameters(message)
 		const isMessage = params?.includes('m')
 		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
 
 		try {
 			const botId = parseInt(process.env.BOT_ID || process.env.VK_BOT_ID || '0')
+			
+			// Find all Brasileirão round IDs
+			const brRounds = await BolaoRound.find({ championshipName: 'Campeonato Brasileiro' })
+			const brRoundIds = brRounds.map(r => r._id)
+
 			const betsAggregation = await Bet.aggregate([
-				{ $match: { cmmId, processed: true, userId: { $ne: botId } } },
+				{ $match: { roundId: { $in: brRoundIds }, processed: true, userId: { $ne: botId } } },
 				{ $group: { _id: '$userId', totalPoints: { $sum: '$points' } } },
 				{ $sort: { totalPoints: -1 } },
 				{ $limit: 10 }
@@ -1085,11 +1171,38 @@ Resumo:`
 			}
 
 			const userIds = betsAggregation.map(r => r._id)
-			const vkUsers = await vkApi.users.get({ userIds })
+			const cachedMembers = await Member.find({ userId: { $in: userIds } })
+			const cachedMap = new Map(cachedMembers.map(m => [m.userId, m]))
+
+			const missingIds = userIds.filter(id => {
+				const cached = cachedMap.get(id)
+				return !cached || !cached.firstName
+			})
+
+			let vkUsers: any[] = []
+			if (missingIds.length > 0) {
+				try {
+					vkUsers = (await vkApi.users.get({ userIds: missingIds })) || []
+					for (const u of vkUsers) {
+						Member.updateMany(
+							{ userId: u.id },
+							{ $set: { firstName: u.first_name, lastName: u.last_name } }
+						).catch(() => {})
+					}
+				} catch (err) {
+					console.error('Erro ao buscar usuários do VK para bolão:', err)
+				}
+			}
 
 			const rankingLines = betsAggregation.map((row, idx) => {
 				const vkUser = vkUsers.find((u: any) => u.id === row._id)
-				const name = vkUser ? `${vkUser.first_name} ${vkUser.last_name}` : `Membro ${row._id}`
+				let name = ''
+				if (vkUser) {
+					name = `${vkUser.first_name} ${vkUser.last_name}`
+				} else {
+					const cached = cachedMap.get(row._id)
+					name = cached?.firstName ? `${cached.firstName} ${cached.lastName || ''}`.trim() : `Membro ${row._id}`
+				}
 				return `${idx + 1}. [id${row._id}|${name}] - ${row.totalPoints} pts`
 			})
 
@@ -1100,6 +1213,80 @@ Resumo:`
 				: await vkApi.board.createComment({ topicId, cmmId, text })
 		} catch (error) {
 			console.error('Erro ao buscar ranking do bolão:', error)
+		}
+	},
+
+	async sendCopaRanking(data: ICommandsInput): Promise<void> {
+		const { topicId, cmmId, postId, userId, message } = data
+		const params = this.getCommandParameters(message)
+		const isMessage = params?.includes('m')
+		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
+
+		try {
+			const botId = parseInt(process.env.BOT_ID || process.env.VK_BOT_ID || '0')
+			
+			// Find all World Cup round IDs
+			const copaRounds = await BolaoRound.find({ championshipName: 'Copa do Mundo 2026' })
+			const copaRoundIds = copaRounds.map(r => r._id)
+
+			const betsAggregation = await Bet.aggregate([
+				{ $match: { roundId: { $in: copaRoundIds }, processed: true, userId: { $ne: botId } } },
+				{ $group: { _id: '$userId', totalPoints: { $sum: '$points' } } },
+				{ $sort: { totalPoints: -1 } },
+				{ $limit: 10 }
+			])
+
+			if (betsAggregation.length === 0) {
+				const responseText = `${quote} Nenhum palpite foi apurado ainda no Bolão da Copa.`
+				isMessage
+					? await vkApi.messages.send({ peerId: userId, message: responseText })
+					: await vkApi.board.createComment({ topicId, cmmId, text: responseText })
+				return
+			}
+
+			const userIds = betsAggregation.map(r => r._id)
+			const cachedMembers = await Member.find({ userId: { $in: userIds } })
+			const cachedMap = new Map(cachedMembers.map(m => [m.userId, m]))
+
+			const missingIds = userIds.filter(id => {
+				const cached = cachedMap.get(id)
+				return !cached || !cached.firstName
+			})
+
+			let vkUsers: any[] = []
+			if (missingIds.length > 0) {
+				try {
+					vkUsers = (await vkApi.users.get({ userIds: missingIds })) || []
+					for (const u of vkUsers) {
+						Member.updateMany(
+							{ userId: u.id },
+							{ $set: { firstName: u.first_name, lastName: u.last_name } }
+						).catch(() => {})
+					}
+				} catch (err) {
+					console.error('Erro ao buscar usuários do VK para bolão da Copa:', err)
+				}
+			}
+
+			const rankingLines = betsAggregation.map((row, idx) => {
+				const vkUser = vkUsers.find((u: any) => u.id === row._id)
+				let name = ''
+				if (vkUser) {
+					name = `${vkUser.first_name} ${vkUser.last_name}`
+				} else {
+					const cached = cachedMap.get(row._id)
+					name = cached?.firstName ? `${cached.firstName} ${cached.lastName || ''}`.trim() : `Membro ${row._id}`
+				}
+				return `${idx + 1}. [id${row._id}|${name}] - ${row.totalPoints} pts`
+			})
+
+			const text = `${quote}\n🏆 *Ranking Geral do Bolão da Copa do Mundo* 🏆\n\n${rankingLines.join('\n')}`
+
+			isMessage
+				? await vkApi.messages.send({ peerId: userId, message: text })
+				: await vkApi.board.createComment({ topicId, cmmId, text })
+		} catch (error) {
+			console.error('Erro ao buscar ranking do bolão da Copa:', error)
 		}
 	},
 	async sendRpgRanking(data: ICommandsInput): Promise<void> {
@@ -1181,11 +1368,33 @@ Resumo:`
 			}
 
 			const userIds = members.map(m => m.userId)
-			const vkUsers = await vkApi.users.get({ userIds })
+			const missingIds = members
+				.filter(m => !m.firstName)
+				.map(m => m.userId)
+
+			let vkUsers: any[] = []
+			if (missingIds.length > 0) {
+				try {
+					vkUsers = (await vkApi.users.get({ userIds: missingIds })) || []
+					for (const u of vkUsers) {
+						Member.updateMany(
+							{ userId: u.id },
+							{ $set: { firstName: u.first_name, lastName: u.last_name } }
+						).catch(() => {})
+					}
+				} catch (err) {
+					console.error('Erro ao buscar usuários do VK para ranking RPG:', err)
+				}
+			}
 
 			const rankingLines = members.map((row, idx) => {
 				const vkUser = vkUsers.find((u: any) => u.id === row.userId)
-				const name = vkUser ? `${vkUser.first_name} ${vkUser.last_name}` : `Membro ${row.userId}`
+				let name = ''
+				if (vkUser) {
+					name = `${vkUser.first_name} ${vkUser.last_name}`
+				} else {
+					name = row.firstName ? `${row.firstName} ${row.lastName || ''}`.trim() : `Membro ${row.userId}`
+				}
 				const generalLvlInfo = generalFncs.getLevelInfo(row.generalXp)
 				return `${idx + 1}. [id${row.userId}|${name}] - Nível ${generalLvlInfo.level} (XP: ${row.generalXp}) (Posts: ${row.totalPosts} | Likes rec.: ${row.totalLikesReceived || 0} | Tópicos: ${row.totalTopicsCreated || 0})`
 			})

@@ -40,6 +40,18 @@ const MembersSchema = new mongoose.Schema<IMembers>(
 			type: 'date',
 			required: false,
 		},
+		firstName: {
+			type: 'string',
+			required: false,
+		},
+		lastName: {
+			type: 'string',
+			required: false,
+		},
+		photoUrl: {
+			type: 'string',
+			required: false,
+		},
 	},
 	{ collection: 'members' }
 )

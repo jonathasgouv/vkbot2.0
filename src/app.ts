@@ -7,6 +7,7 @@ import cors from 'cors'
 import mongoose from 'mongoose'
 import Member from '@models/Member'
 import Bet from '@models/Bet'
+import BolaoRound from '@models/BolaoRound'
 import vkApi from '@api/vk'
 import generalFncs from '@utils/general'
 import path from 'path'
@@ -85,7 +86,8 @@ app.get('/api/ranking', async (request, response) => {
 		const period = (request.query.period as string) || 'overall'
 		const searchQuery = (request.query.search as string || '').trim().toLowerCase()
 		const type = (request.query.type as string) || 'activity'
-		const cacheKey = `cmm_${cmmId}_${period}_${type}_${searchQuery}`
+		const championship = (request.query.championship as string) || 'brasileirao'
+		const cacheKey = `cmm_${cmmId}_${period}_${type}_${championship}_${searchQuery}`
 		const cached = rankingCache.get(cacheKey)
 		const now = Date.now()
 
@@ -177,6 +179,14 @@ app.get('/api/ranking', async (request, response) => {
 			betsMatchQuery.createdAt = { $gte: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000) }
 		}
 
+		let targetChampionshipName = 'Campeonato Brasileiro'
+		if (championship === 'copa') {
+			targetChampionshipName = 'Copa do Mundo 2026'
+		}
+		const matchingRounds = await BolaoRound.find({ championshipName: targetChampionshipName, cmmId }).select('_id').lean()
+		const roundIds = matchingRounds.map(r => r._id)
+		betsMatchQuery.roundId = { $in: roundIds }
+
 		// Bolão Ranking (Fetch all to assign absolute ranks)
 		const bolao = await Bet.aggregate([
 			{ $match: betsMatchQuery },
@@ -230,6 +240,11 @@ app.get('/api/ranking', async (request, response) => {
 								photo_100: u.photo_100,
 								timestamp: now
 							})
+							// Cache in MongoDB asynchronously
+							Member.updateMany(
+								{ userId: u.id },
+								{ $set: { firstName: u.first_name, lastName: u.last_name, photoUrl: u.photo_100 } }
+							).catch(err => console.error('Error saving user cache in DB:', err))
 						}
 					}
 					// Add a small 50ms delay between chunks to respect rate limits if we are fetching multiple pages
@@ -246,8 +261,10 @@ app.get('/api/ranking', async (request, response) => {
 		const rpgRanking = sortedMembersWithRank.map((item) => {
 			const m = item.member
 			const cachedUser = vkUserCache.get(Number(m.userId))
-			const name = cachedUser ? `${cachedUser.first_name} ${cachedUser.last_name}` : `Membro ${m.userId}`
-			const photo = cachedUser?.photo_100 || 'https://vk.com/images/camera_100.png'
+			const name = cachedUser 
+				? `${cachedUser.first_name} ${cachedUser.last_name}` 
+				: (m.firstName ? `${m.firstName} ${m.lastName || ''}`.trim() : `Membro ${m.userId}`)
+			const photo = cachedUser?.photo_100 || m.photoUrl || 'https://vk.com/images/camera_100.png'
 			
 			const lvlInfo = generalFncs.getLevelInfo(m.totalPosts * 10)
 			const engagementLvlInfo = generalFncs.getLevelInfo(item.engagementXp)
@@ -311,11 +328,13 @@ app.get('/api/ranking', async (request, response) => {
 			}
 		})
 
-		// Map Bolão ranking and assign absolute ranks
 		const bolaoRanking = bolao.map((b, index) => {
 			const cachedUser = vkUserCache.get(Number(b._id))
-			const name = cachedUser ? `${cachedUser.first_name} ${cachedUser.last_name}` : `Membro ${b._id}`
-			const photo = cachedUser?.photo_100 || 'https://vk.com/images/camera_100.png'
+			const dbMember = members.find(m => Number(m.userId) === Number(b._id))
+			const name = cachedUser 
+				? `${cachedUser.first_name} ${cachedUser.last_name}` 
+				: (dbMember?.firstName ? `${dbMember.firstName} ${dbMember.lastName || ''}`.trim() : `Membro ${b._id}`)
+			const photo = cachedUser?.photo_100 || dbMember?.photoUrl || 'https://vk.com/images/camera_100.png'
 			return {
 				userId: b._id,
 				name,

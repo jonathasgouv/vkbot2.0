@@ -8,4 +8,7 @@ export default interface IMember {
 	totalCommentsOnTopics?: number
 	lastProfileCommandAt?: Date
 	lastRankingCommandAt?: Date
+	firstName?: string
+	lastName?: string
+	photoUrl?: string
 }

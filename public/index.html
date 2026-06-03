@@ -836,6 +836,7 @@
 					<button class="tab-btn" data-category="rpg">RPG & Nível</button>
 					<button class="tab-btn" data-category="bolao">Bolão</button>
 					<button class="tab-btn" data-category="monitor">Monitorador</button>
+					<button class="tab-btn" data-category="interaction">Interações</button>
 					<button class="tab-btn" data-category="utils">Úteis</button>
 				</div>
 			</div>
@@ -940,7 +941,7 @@
 			},
 			{
 				trigger: '!ranking',
-				shortcut: '',
+				shortcut: '!rk',
 				category: 'bolao',
 				description: 'Apresenta a classificação acumulada de todos os participantes do Bolão do Brasileirão na comunidade.',
 				usage: '!ranking'
@@ -953,10 +954,17 @@
 				usage: '!rkcopa'
 			},
 			{
+				trigger: '!bolao',
+				shortcut: '!b',
+				category: 'bolao',
+				description: 'Retorna o link direto para visualizar todas as rodadas, jogos cadastrados e palpites do Bolão.',
+				usage: '!bolao'
+			},
+			{
 				trigger: '!monitorar',
 				shortcut: '!mon',
 				category: 'monitor',
-				description: 'Cadastra uma palavra-chave para o monitorador. Você receberá um alerta privado via mensagem do bot quando o termo for citado. Use a flag -e para busca exata.',
+				description: 'Cadastra uma palavra-chave para o monitorador. Você receberá um alerta privado via mensagem do bot quando o termo for citado nos fóruns. Use a flag -e para busca exata.',
 				usage: '!monitorar ingressos  |  !mon -e gol'
 			},
 			{
@@ -974,17 +982,80 @@
 				usage: '!monitorados'
 			},
 			{
-				trigger: '!resumo',
-				shortcut: '',
+				trigger: '!citar',
+				shortcut: '!c',
+				category: 'interaction',
+				description: 'Responde ao comentário atual citando o autor dele com o formato de post do VK.',
+				usage: '!citar'
+			},
+			{
+				trigger: '!tag',
+				shortcut: '!t',
+				category: 'interaction',
+				description: 'Cita o comentário atual e anexa uma marcação com tag/texto personalizado (ex: para alertar alguém ou destacar trechos).',
+				usage: '!tag [texto]'
+			},
+			{
+				trigger: '!like',
+				shortcut: '!l',
+				category: 'interaction',
+				description: 'Dá uma curtida automática no comentário em que o comando foi chamado.',
+				usage: '!like'
+			},
+			{
+				trigger: '!mensagem',
+				shortcut: '!m',
+				category: 'interaction',
+				description: 'Envia o link do tópico de discussões atual diretamente para as mensagens privadas (DM) do usuário.',
+				usage: '!mensagem'
+			},
+			{
+				trigger: '!jogos',
+				shortcut: '!j',
 				category: 'utils',
-				description: 'Utiliza IA (Gemini-2.0-flash) para resumir as principais discussões do tópico ativo. Válido apenas em tópicos com pelo menos 100 comentários.',
+				description: 'Busca os jogos da rodada atual do Brasileirão. Opcionalmente especifique a série (a, b, c, d) nas flags.',
+				usage: '!jogos -b'
+			},
+			{
+				trigger: '!remind',
+				shortcut: '!r',
+				category: 'utils',
+				description: 'Agenda um lembrete do bot para o post atual após o tempo especificado (ex: minutos, horas ou dias).',
+				usage: '!remind 30m  |  !remind 2h'
+			},
+			{
+				trigger: '!save',
+				shortcut: '!s',
+				category: 'utils',
+				description: 'Cria uma referência do tópico atual e a envia como comentário em outro grupo ou tópico especificado.',
+				usage: '!save cmm:[ID] tid:[ID]'
+			},
+			{
+				trigger: '!pesquisar',
+				shortcut: '!p',
+				category: 'utils',
+				description: 'Pesquisa por posts ou títulos contendo o termo de busca no grupo. Use as flags -c (comentários) ou -t (tópicos).',
+				usage: '!pesquisar -c futebol'
+			},
+			{
+				trigger: '!wiki',
+				shortcut: '!w',
+				category: 'utils',
+				description: 'Busca um resumo ou definição de termo diretamente da Wikipédia e o envia no chat/tópico.',
+				usage: '!wiki Futebol'
+			},
+			{
+				trigger: '!resumo',
+				shortcut: '!rs',
+				category: 'utils',
+				description: 'Utiliza IA (Gemini-2.0-flash) para resumir as discussões do tópico ativo. Válido apenas em tópicos com pelo menos 100 comentários.',
 				usage: '!resumo'
 			},
 			{
 				trigger: '!ajuda',
 				shortcut: '',
 				category: 'utils',
-				description: 'Exibe a lista de comandos básicos e informações de suporte do bot.',
+				description: 'Retorna a mensagem oficial de ajuda com a lista de utilidades básicas e links principais do bot.',
 				usage: '!ajuda'
 			}
 		];

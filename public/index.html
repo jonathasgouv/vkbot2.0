@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="description" content="VKBot - O bot de engajamento definitivo para comunidades do VK. RPG de Níveis, Bolões e Monitoramento de Termos.">
+	<meta property="og:title" content="VKBot - Engajamento e Gamificação para Comunidades">
+	<meta property="og:description" content="Maximize a interação do seu grupo no VK com RPG de Níveis, bolões e recursos inteligentes.">
+	<title>VKBot - Central de Engajamento</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+	<style>
+		:root {
+			--bg-color: #080d16;
+			--card-bg: rgba(13, 22, 38, 0.7);
+			--border-color: rgba(255, 255, 255, 0.08);
+			--text-main: #f3f4f6;
+			--text-muted: #9ca3af;
+			--primary: #00f2fe;
+			--primary-glow: rgba(0, 242, 254, 0.15);
+			--success: #10b981;
+			--success-glow: rgba(16, 185, 129, 0.15);
+			--card-radius: 16px;
+			--transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+		}
+
+		* {
+			box-sizing: border-box;
+			margin: 0;
+			padding: 0;
+		}
+
+		html {
+			scroll-behavior: smooth;
+		}
+
+		body {
+			font-family: 'Inter', sans-serif;
+			background-color: var(--bg-color);
+			color: var(--text-main);
+			line-height: 1.6;
+			overflow-x: hidden;
+			background-image: 
+				radial-gradient(at 0% 0%, rgba(0, 242, 254, 0.05) 0px, transparent 50%),
+				radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.05) 0px, transparent 50%);
+			background-attachment: fixed;
+		}
+
+		/* Header Styling */
+		header {
+			position: fixed;
+			top: 0;
+			left: 0;
+			right: 0;
+			z-index: 100;
+			background: rgba(8, 13, 22, 0.75);
+			backdrop-filter: blur(16px);
+			-webkit-backdrop-filter: blur(16px);
+			border-bottom: 1px solid var(--border-color);
+			transition: var(--transition);
+		}
+
+		.nav-container {
+			max-width: 1200px;
+			margin: 0 auto;
+			padding: 1rem 1.5rem;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+		}
+
+		.logo {
+			font-family: 'Outfit', sans-serif;
+			font-size: 1.5rem;
+			font-weight: 800;
+			color: #fff;
+			text-decoration: none;
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+		}
+
+		.logo span {
+			background: linear-gradient(135deg, var(--primary), var(--success));
+			-webkit-background-clip: text;
+			-webkit-text-fill-color: transparent;
+		}
+
+		.nav-menu {
+			display: flex;
+			align-items: center;
+			gap: 2rem;
+			list-style: none;
+		}
+
+		@media (max-width: 768px) {
+			.nav-menu {
+				display: none;
+			}
+		}
+
+		.nav-link {
+			color: var(--text-muted);
+			text-decoration: none;
+			font-weight: 500;
+			font-size: 0.95rem;
+			transition: var(--transition);
+		}
+
+		.nav-link:hover {
+			color: var(--primary);
+		}
+
+		.btn-cta {
+			background: linear-gradient(135deg, var(--primary), var(--success));
+			color: #080d16;
+			text-decoration: none;
+			font-family: 'Outfit', sans-serif;
+			font-weight: 700;
+			padding: 0.6rem 1.25rem;
+			border-radius: 50px;
+			box-shadow: 0 4px 15px var(--primary-glow);
+			transition: var(--transition);
+			display: inline-block;
+			border: none;
+			cursor: pointer;
+		}
+
+		.btn-cta:hover {
+			transform: translateY(-2px);
+			box-shadow: 0 6px 20px rgba(0, 242, 254, 0.35);
+			background: #fff;
+			color: #080d16;
+		}
+
+		.btn-outline {
+			background: transparent;
+			border: 1px solid var(--border-color);
+			color: var(--text-main);
+			text-decoration: none;
+			font-family: 'Outfit', sans-serif;
+			font-weight: 600;
+			padding: 0.6rem 1.25rem;
+			border-radius: 50px;
+			transition: var(--transition);
+			display: inline-block;
+		}
+
+		.btn-outline:hover {
+			border-color: var(--primary);
+			color: var(--primary);
+			box-shadow: 0 0 10px var(--primary-glow);
+		}
+
+		/* Hero Section */
+		.hero {
+			padding: 8rem 1.5rem 4rem;
+			max-width: 1200px;
+			margin: 0 auto;
+			display: grid;
+			grid-template-columns: 1fr;
+			gap: 3rem;
+			align-items: center;
+		}
+
+		@media (min-width: 1024px) {
+			.hero {
+				grid-template-columns: 1.1fr 0.9fr;
+				padding: 10rem 1.5rem 6rem;
+			}
+		}
+
+		.hero-content h1 {
+			font-family: 'Outfit', sans-serif;
+			font-size: 3rem;
+			font-weight: 900;
+			line-height: 1.15;
+			margin-bottom: 1.5rem;
+			letter-spacing: -0.03em;
+		}
+
+		@media (min-width: 768px) {
+			.hero-content h1 {
+				font-size: 4rem;
+			}
+		}
+
+		.hero-content h1 span {
+			background: linear-gradient(135deg, var(--primary) 30%, var(--success) 100%);
+			-webkit-background-clip: text;
+			-webkit-text-fill-color: transparent;
+		}
+
+		.hero-content p {
+			color: var(--text-muted);
+			font-size: 1.2rem;
+			margin-bottom: 2.5rem;
+			max-width: 550px;
+		}
+
+		.hero-ctas {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 1rem;
+		}
+
+		/* Mock Chat Window in Hero */
+		.mock-chat-container {
+			background: var(--card-bg);
+			border: 1px solid var(--border-color);
+			border-radius: var(--card-radius);
+			backdrop-filter: blur(16px);
+			-webkit-backdrop-filter: blur(16px);
+			box-shadow: 0 20px 50px -15px rgba(0, 0, 0, 0.7);
+			overflow: hidden;
+			display: flex;
+			flex-direction: column;
+			height: 380px;
+			animation: fadeInUp 0.8s ease-out;
+		}
+
+		.chat-header {
+			background: rgba(255, 255, 255, 0.03);
+			border-bottom: 1px solid var(--border-color);
+			padding: 0.75rem 1rem;
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+		}
+
+		.chat-dot {
+			width: 10px;
+			height: 10px;
+			border-radius: 50%;
+		}
+
+		.dot-red { background: #ef4444; }
+		.dot-yellow { background: #f59e0b; }
+		.dot-green { background: #10b981; }
+
+		.chat-title {
+			flex-grow: 1;
+			text-align: center;
+			font-size: 0.8rem;
+			color: var(--text-muted);
+			font-weight: 600;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+		}
+
+		.chat-body {
+			flex-grow: 1;
+			padding: 1.25rem;
+			display: flex;
+			flex-direction: column;
+			gap: 1.25rem;
+			overflow-y: auto;
+			font-size: 0.85rem;
+		}
+
+		.chat-bubble {
+			max-width: 80%;
+			padding: 0.75rem 1rem;
+			border-radius: 12px;
+			position: relative;
+		}
+
+		.bubble-user {
+			align-self: flex-end;
+			background: rgba(255, 255, 255, 0.05);
+			color: var(--text-main);
+			border-bottom-right-radius: 2px;
+		}
+
+		.bubble-bot {
+			align-self: flex-start;
+			background: rgba(0, 242, 254, 0.08);
+			border: 1px solid rgba(0, 242, 254, 0.15);
+			color: var(--text-main);
+			border-bottom-left-radius: 2px;
+		}
+
+		.bot-name {
+			font-weight: 700;
+			color: var(--primary);
+			margin-bottom: 0.25rem;
+			display: flex;
+			align-items: center;
+			gap: 0.35rem;
+		}
+
+		.bot-badge {
+			font-size: 0.65rem;
+			background: var(--primary);
+			color: #080d16;
+			padding: 1px 4px;
+			border-radius: 3px;
+			font-weight: 800;
+		}
+
+		/* Stats Section */
+		.stats-section {
+			background: rgba(13, 22, 38, 0.4);
+			border-top: 1px solid var(--border-color);
+			border-bottom: 1px solid var(--border-color);
+			padding: 3rem 1.5rem;
+		}
+
+		.stats-container {
+			max-width: 1200px;
+			margin: 0 auto;
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+			gap: 2.5rem;
+			text-align: center;
+		}
+
+		.stat-item h3 {
+			font-family: 'Outfit', sans-serif;
+			font-size: 3rem;
+			font-weight: 800;
+			color: var(--primary);
+			margin-bottom: 0.25rem;
+			background: linear-gradient(135deg, var(--primary), var(--success));
+			-webkit-background-clip: text;
+			-webkit-text-fill-color: transparent;
+		}
+
+		.stat-item p {
+			color: var(--text-muted);
+			font-size: 0.95rem;
+			font-weight: 500;
+			text-transform: uppercase;
+			letter-spacing: 0.05em;
+		}
+
+		/* Features Section */
+		.section-padding {
+			padding: 6rem 1.5rem;
+			max-width: 1200px;
+			margin: 0 auto;
+		}
+
+		.section-title {
+			text-align: center;
+			margin-bottom: 4rem;
+		}
+
+		.section-title h2 {
+			font-family: 'Outfit', sans-serif;
+			font-size: 2.5rem;
+			font-weight: 800;
+			letter-spacing: -0.02em;
+			margin-bottom: 0.5rem;
+		}
+
+		.section-title h2 span {
+			background: linear-gradient(135deg, var(--primary), var(--success));
+			-webkit-background-clip: text;
+			-webkit-text-fill-color: transparent;
+		}
+
+		.section-title p {
+			color: var(--text-muted);
+			font-size: 1.1rem;
+			max-width: 600px;
+			margin: 0 auto;
+		}
+
+		.features-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+			gap: 2.5rem;
+		}
+
+		.feature-card {
+			background: var(--card-bg);
+			border: 1px solid var(--border-color);
+			border-radius: var(--card-radius);
+			padding: 2.5rem 2rem;
+			transition: var(--transition);
+			cursor: default;
+		}
+
+		.feature-card:hover {
+			transform: translateY(-5px);
+			border-color: rgba(0, 242, 254, 0.2);
+			box-shadow: 0 10px 30px -10px var(--primary-glow);
+		}
+
+		.feature-icon {
+			font-size: 2.5rem;
+			margin-bottom: 1.5rem;
+			display: inline-block;
+		}
+
+		.feature-card h3 {
+			font-family: 'Outfit', sans-serif;
+			font-size: 1.35rem;
+			font-weight: 700;
+			margin-bottom: 1rem;
+			color: #fff;
+		}
+
+		.feature-card p {
+			color: var(--text-muted);
+			font-size: 0.95rem;
+			margin-bottom: 1.5rem;
+		}
+
+		.feature-list {
+			list-style: none;
+			font-size: 0.9rem;
+			color: var(--text-main);
+			display: flex;
+			flex-direction: column;
+			gap: 0.5rem;
+		}
+
+		.feature-list li {
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+		}
+
+		.feature-list li::before {
+			content: '✓';
+			color: var(--success);
+			font-weight: 800;
+		}
+
+		/* Commands Search Section */
+		.commands-section {
+			background: rgba(13, 22, 38, 0.25);
+			border-top: 1px solid var(--border-color);
+			border-bottom: 1px solid var(--border-color);
+		}
+
+		.commands-wrap {
+			max-width: 1000px;
+			margin: 0 auto;
+			padding: 6rem 1.5rem;
+		}
+
+		.search-controls {
+			display: flex;
+			flex-direction: column;
+			gap: 1.5rem;
+			margin-bottom: 3rem;
+		}
+
+		@media (min-width: 768px) {
+			.search-controls {
+				flex-direction: row;
+				justify-content: space-between;
+				align-items: center;
+			}
+		}
+
+		.search-input-wrap {
+			display: flex;
+			align-items: center;
+			background: var(--card-bg);
+			border: 1px solid var(--border-color);
+			border-radius: 50px;
+			padding: 0.25rem 0.5rem 0.25rem 1.5rem;
+			width: 100%;
+			max-width: 450px;
+			transition: var(--transition);
+		}
+
+		.search-input-wrap:focus-within {
+			border-color: var(--primary);
+			box-shadow: 0 0 15px var(--primary-glow);
+		}
+
+		.search-input-wrap input {
+			background: transparent;
+			border: none;
+			outline: none;
+			color: var(--text-main);
+			font-family: inherit;
+			font-size: 0.95rem;
+			width: 100%;
+			padding: 0.5rem 0;
+		}
+
+		.search-input-wrap input::placeholder {
+			color: var(--text-muted);
+		}
+
+		.search-input-wrap span.search-icon {
+			font-size: 1rem;
+			margin-right: 0.5rem;
+			color: var(--text-muted);
+		}
+
+		.tabs-container {
+			display: flex;
+			background: rgba(13, 22, 38, 0.5);
+			border: 1px solid var(--border-color);
+			padding: 0.35rem;
+			border-radius: 50px;
+			gap: 0.25rem;
+			align-self: flex-start;
+			overflow-x: auto;
+			max-width: 100%;
+		}
+
+		.tab-btn {
+			background: transparent;
+			border: none;
+			outline: none;
+			color: var(--text-muted);
+			font-family: 'Outfit', sans-serif;
+			font-size: 0.9rem;
+			font-weight: 600;
+			padding: 0.5rem 1.25rem;
+			border-radius: 50px;
+			cursor: pointer;
+			transition: var(--transition);
+			white-space: nowrap;
+		}
+
+		.tab-btn:hover {
+			color: var(--text-main);
+			background: rgba(255, 255, 255, 0.05);
+		}
+
+		.tab-btn.active {
+			background: linear-gradient(135deg, var(--primary), var(--success));
+			color: #080d16;
+			box-shadow: 0 4px 15px rgba(0, 242, 254, 0.25);
+		}
+
+		.commands-list {
+			display: flex;
+			flex-direction: column;
+			gap: 1.25rem;
+		}
+
+		.command-item {
+			background: var(--card-bg);
+			border: 1px solid var(--border-color);
+			border-radius: 12px;
+			padding: 1.5rem;
+			transition: var(--transition);
+		}
+
+		.command-item:hover {
+			border-color: rgba(0, 242, 254, 0.15);
+			background: rgba(13, 22, 38, 0.85);
+		}
+
+		.command-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 0.5rem;
+			flex-wrap: wrap;
+			gap: 0.5rem;
+		}
+
+		.command-trigger {
+			font-family: 'Outfit', sans-serif;
+			font-size: 1.25rem;
+			font-weight: 700;
+			color: var(--primary);
+			display: flex;
+			align-items: center;
+			gap: 0.5rem;
+		}
+
+		.command-trigger small {
+			font-size: 0.85rem;
+			color: var(--text-muted);
+			font-weight: 400;
+		}
+
+		.command-cat-badge {
+			font-size: 0.7rem;
+			text-transform: uppercase;
+			font-weight: 700;
+			padding: 0.2rem 0.5rem;
+			border-radius: 4px;
+			background: rgba(255, 255, 255, 0.05);
+			border: 1px solid rgba(255, 255, 255, 0.05);
+			color: var(--text-muted);
+		}
+
+		.command-description {
+			color: var(--text-muted);
+			font-size: 0.95rem;
+			margin-bottom: 0.75rem;
+		}
+
+		.command-usage {
+			font-family: monospace;
+			font-size: 0.85rem;
+			background: rgba(0, 0, 0, 0.25);
+			padding: 0.5rem 0.75rem;
+			border-radius: 6px;
+			color: var(--success);
+			border-left: 3px solid var(--success);
+		}
+
+		.no-results {
+			text-align: center;
+			color: var(--text-muted);
+			padding: 4rem 0;
+			font-size: 1.1rem;
+		}
+
+		/* How to Setup */
+		.setup-steps {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+			gap: 2.5rem;
+			margin-top: 4rem;
+		}
+
+		.step-card {
+			text-align: center;
+			position: relative;
+		}
+
+		.step-num {
+			width: 3.5rem;
+			height: 3.5rem;
+			background: linear-gradient(135deg, var(--primary), var(--success));
+			color: #080d16;
+			font-family: 'Outfit', sans-serif;
+			font-size: 1.5rem;
+			font-weight: 800;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			border-radius: 50%;
+			margin: 0 auto 1.5rem;
+			box-shadow: 0 4px 15px rgba(0, 242, 254, 0.25);
+		}
+
+		.step-card h3 {
+			font-family: 'Outfit', sans-serif;
+			font-size: 1.25rem;
+			font-weight: 700;
+			margin-bottom: 0.5rem;
+		}
+
+		.step-card p {
+			color: var(--text-muted);
+			font-size: 0.95rem;
+			max-width: 250px;
+			margin: 0 auto;
+		}
+
+		/* Footer */
+		footer {
+			background: #04070d;
+			border-top: 1px solid var(--border-color);
+			padding: 3rem 1.5rem;
+			text-align: center;
+			color: var(--text-muted);
+			font-size: 0.9rem;
+		}
+
+		.footer-links {
+			display: flex;
+			justify-content: center;
+			gap: 1.5rem;
+			margin-bottom: 1.5rem;
+			list-style: none;
+		}
+
+		.footer-links a {
+			color: var(--text-muted);
+			text-decoration: none;
+			transition: var(--transition);
+		}
+
+		.footer-links a:hover {
+			color: var(--primary);
+		}
+
+		/* Keyframe animations */
+		@keyframes fadeInUp {
+			from {
+				opacity: 0;
+				transform: translateY(30px);
+			}
+			to {
+				opacity: 1;
+				transform: translateY(0);
+			}
+		}
+	</style>
+</head>
+<body>
+	<!-- Sticky Header -->
+	<header>
+		<div class="nav-container">
+			<a href="#" class="logo">⚽ VK<span>Bot</span></a>
+			<ul class="nav-menu">
+				<li><a href="#features" class="nav-link">Recursos</a></li>
+				<li><a href="#commands" class="nav-link">Comandos</a></li>
+				<li><a href="#setup" class="nav-link">Como Configurar</a></li>
+			</ul>
+			<div style="display: flex; gap: 0.75rem;">
+				<a href="https://vk.com/im?sel=-220000000" target="_blank" class="btn-outline" style="padding: 0.5rem 1rem; font-size: 0.85rem; display: inline-flex; align-items: center;">Adicionar ao Grupo</a>
+				<a href="/ranking" class="btn-cta" style="padding: 0.5rem 1rem; font-size: 0.85rem;">Ranking Geral</a>
+			</div>
+		</div>
+	</header>
+
+	<!-- Hero Banner -->
+	<section class="hero">
+		<div class="hero-content">
+			<h1>Engaje e gamifique sua comunidade <span>VK</span></h1>
+			<p>O VKBot traz rankings de RPG automáticos, bolão da copa e monitoramento inteligente de palavras-chave para o seu grupo.</p>
+			<div class="hero-ctas">
+				<a href="/ranking" class="btn-cta">Acessar Ranking Geral</a>
+				<a href="#commands" class="btn-outline">Ver Comandos</a>
+			</div>
+		</div>
+		<div class="mock-chat-container">
+			<div class="chat-header">
+				<div class="chat-dot dot-red"></div>
+				<div class="chat-dot dot-yellow"></div>
+				<div class="chat-dot dot-green"></div>
+				<div class="chat-title">Visualização do Bot</div>
+			</div>
+			<div class="chat-body" id="chat-body">
+				<!-- Mock interaction 1 -->
+				<div class="chat-bubble bubble-user">
+					!pf
+				</div>
+				<div class="chat-bubble bubble-bot">
+					<div class="bot-name">⚽ VKBot <span class="bot-badge">BOT</span></div>
+					🏆 <strong>Perfil de John Doe</strong> 🏆<br>
+					⭐ Nível Geral: 18 [████░░░░░░] 42%<br>
+					✍️ Atividade: Nível 15 (150 posts escrito)<br>
+					❤️ Engajamento: Nível 22 (142 curtidas recebidas | 12 tópicos)
+				</div>
+				<!-- Mock interaction 2 -->
+				<div class="chat-bubble bubble-user">
+					!rkc
+				</div>
+				<div class="chat-bubble bubble-bot">
+					<div class="bot-name">⚽ VKBot <span class="bot-badge">BOT</span></div>
+					🏆 <strong>Ranking Bolão Copa do Mundo 2026</strong> 🏆<br>
+					1. John Doe - 45 pontos<br>
+					2. Jane Smith - 42 pontos<br>
+					3. Diego - 38 pontos
+				</div>
+			</div>
+		</div>
+	</section>
+
+	<!-- Live Statistics Section -->
+	<section class="stats-section">
+		<div class="stats-container">
+			<div class="stat-item">
+				<h3 id="stat-posts">457.280</h3>
+				<p>Mensagens processadas</p>
+			</div>
+			<div class="stat-item">
+				<h3 id="stat-members">4.520</h3>
+				<p>Membros engajados</p>
+			</div>
+			<div class="stat-item">
+				<h3 id="stat-groups">12</h3>
+				<p>Comunidades ativas</p>
+			</div>
+		</div>
+	</section>
+
+	<!-- Features Showcase Section -->
+	<section class="section-padding" id="features">
+		<div class="section-title">
+			<h2>Recursos que tornam seu grupo <span>ativo</span></h2>
+			<p>Nossas mecânicas integradas motivam os usuários a postarem e criarem tópicos de relevância.</p>
+		</div>
+		<div class="features-grid">
+			<!-- Feature 1 -->
+			<div class="feature-card">
+				<span class="feature-icon">⭐</span>
+				<h3>RPG de Níveis Dual</h3>
+				<p>Separação limpa entre volume de postagem e impacto na comunidade. Os níveis são recalculados dinamicamente.</p>
+				<ul class="feature-list">
+					<li>Nível de atividade por posts</li>
+					<li>Nível de engajamento por curtidas</li>
+					<li>Cálculo de XP Geral acumulado</li>
+				</ul>
+			</div>
+			<!-- Feature 2 -->
+			<div class="feature-card">
+				<span class="feature-icon">🏆</span>
+				<h3>Bolão da Copa e Brasileirão</h3>
+				<p>Tópicos diários abertos automaticamente no fórum para computar palpites dos membros sobre jogos oficiais.</p>
+				<ul class="feature-list">
+					<li>Tópicos de rodada integrados</li>
+					<li>Apuração automática de placar</li>
+					<li>Ranking em tempo real na Web</li>
+				</ul>
+			</div>
+			<!-- Feature 3 -->
+			<div class="feature-card">
+				<span class="feature-icon">🔍</span>
+				<h3>Monitorador de Palavras</h3>
+				<p>Cadastre termos e o bot envia uma mensagem privada de forma instantânea alertando sobre a discussão.</p>
+				<ul class="feature-list">
+					<li>Suporta busca parcial e exata</li>
+					<li>Limite de 5 termos por membro</li>
+					<li>Alerta privado imediato no VK</li>
+				</ul>
+			</div>
+		</div>
+	</section>
+
+	<!-- Interactive Commands Guide Section -->
+	<section class="commands-section" id="commands">
+		<div class="commands-wrap">
+			<div class="section-title" style="margin-bottom: 3rem;">
+				<h2>Guia de <span>comandos</span></h2>
+				<p>Encontre os comandos suportados e aprenda a usá-los no chat ou tópicos de discussões.</p>
+			</div>
+
+			<div class="search-controls">
+				<div class="search-input-wrap">
+					<span class="search-icon">🔍</span>
+					<input type="text" id="command-search" placeholder="Buscar por comando ou termo..." autocomplete="off">
+				</div>
+				<div class="tabs-container">
+					<button class="tab-btn active" data-category="all">Todos</button>
+					<button class="tab-btn" data-category="rpg">RPG & Nível</button>
+					<button class="tab-btn" data-category="bolao">Bolão</button>
+					<button class="tab-btn" data-category="monitor">Monitorador</button>
+					<button class="tab-btn" data-category="utils">Úteis</button>
+				</div>
+			</div>
+
+			<div class="commands-list" id="commands-list">
+				<!-- Appended dynamically -->
+			</div>
+		</div>
+	</section>
+
+	<!-- Setup Guide Section -->
+	<section class="section-padding" id="setup">
+		<div class="section-title">
+			<h2>Pronto para <span>começar</span>?</h2>
+			<p>Configure o bot no seu grupo em menos de 5 minutos seguindo os passos básicos abaixo.</p>
+		</div>
+		<div class="setup-steps">
+			<div class="step-card">
+				<div class="step-num">1</div>
+				<h3>Convide o Bot</h3>
+				<p>Adicione o bot como membro no seu grupo de discussões do VK.</p>
+			</div>
+			<div class="step-card">
+				<div class="step-num">2</div>
+				<h3>Dê Permissões</h3>
+				<p>Promova o bot a Administrador para permitir que ele crie tópicos e leia comentários.</p>
+			</div>
+			<div class="step-card">
+				<div class="step-num">3</div>
+				<h3>Comece a Jogar</h3>
+				<p>Digite <strong>!ajuda</strong> no chat para inicializar a integração e abrir as tabelas.</p>
+			</div>
+		</div>
+		<div style="text-align: center; margin-top: 3.5rem;">
+			<a href="https://vk.com/im?sel=-220000000" target="_blank" class="btn-cta" style="font-size: 1.1rem; padding: 0.8rem 2rem;">Convidar VKBot Agora</a>
+		</div>
+	</section>
+
+	<!-- Footer -->
+	<footer>
+		<ul class="footer-links">
+			<li><a href="/ranking">Placar de Líderes</a></li>
+			<li><a href="#features">Recursos</a></li>
+			<li><a href="#commands">Lista de Comandos</a></li>
+		</ul>
+		<p>&copy; 2026 VKBot. Feito para comunidades de futebol e RPG. Todos os direitos reservados.</p>
+	</footer>
+
+	<!-- Scripts for Simulated Stats & Interactivity -->
+	<script>
+		// 1. Simulated Live Ticker
+		let basePosts = 457280;
+		let baseMembers = 4520;
+		let baseGroups = 12;
+
+		const postEl = document.getElementById('stat-posts');
+		const memberEl = document.getElementById('stat-members');
+		const groupEl = document.getElementById('stat-groups');
+
+		// Utility to format numbers with dots
+		function formatNum(num) {
+			return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+		}
+
+		// Random counter ticking
+		setInterval(() => {
+			// Random posts increment (+0 to +3)
+			basePosts += Math.floor(Math.random() * 4);
+			
+			// Random member signup chance (10% chance)
+			if (Math.random() < 0.1) {
+				baseMembers += 1;
+			}
+
+			// Render
+			postEl.textContent = formatNum(basePosts);
+			memberEl.textContent = formatNum(baseMembers);
+		}, 3000);
+
+		// 2. Command Database
+		const commands = [
+			{
+				trigger: '!perfil',
+				shortcut: '!pf',
+				category: 'rpg',
+				description: 'Exibe seu perfil unificado, mostrando o Nível Geral, o nível de Atividade (posts) e o nível de Engajamento (likes e tópicos criados). Possui cooldown de 24 horas por usuário.',
+				usage: '!perfil'
+			},
+			{
+				trigger: '!rkpf',
+				shortcut: '',
+				category: 'rpg',
+				description: 'Mostra a classificação geral do RPG de Níveis da comunidade atual, ordenada com base no XP Geral acumulado. Possui cooldown de 24 horas.',
+				usage: '!rkpf'
+			},
+			{
+				trigger: '!vs',
+				shortcut: '',
+				category: 'rpg',
+				description: 'Compara estatísticas de posts e engajamento diretamente com outro usuário mencionado ou pelo ID de perfil dele.',
+				usage: '!vs @membro'
+			},
+			{
+				trigger: '!ranking',
+				shortcut: '',
+				category: 'bolao',
+				description: 'Apresenta a classificação acumulada de todos os participantes do Bolão do Brasileirão na comunidade.',
+				usage: '!ranking'
+			},
+			{
+				trigger: '!rkcopa',
+				shortcut: '!rkc',
+				category: 'bolao',
+				description: 'Exibe a tabela geral de pontuações do Bolão da Copa do Mundo 2026 na comunidade atual.',
+				usage: '!rkcopa'
+			},
+			{
+				trigger: '!monitorar',
+				shortcut: '!mon',
+				category: 'monitor',
+				description: 'Cadastra uma palavra-chave para o monitorador. Você receberá um alerta privado via mensagem do bot quando o termo for citado. Use a flag -e para busca exata.',
+				usage: '!monitorar ingressos  |  !mon -e gol'
+			},
+			{
+				trigger: '!desmonitorar',
+				shortcut: '!dmon',
+				category: 'monitor',
+				description: 'Remove uma palavra-chave cadastrada no seu monitorador pessoal.',
+				usage: '!desmonitorar ingressos'
+			},
+			{
+				trigger: '!monitorados',
+				shortcut: '!mons',
+				category: 'monitor',
+				description: 'Lista todas as palavras-chave cadastradas e monitoradas por você nesta comunidade.',
+				usage: '!monitorados'
+			},
+			{
+				trigger: '!resumo',
+				shortcut: '',
+				category: 'utils',
+				description: 'Utiliza IA (Gemini-2.0-flash) para resumir as principais discussões do tópico ativo. Válido apenas em tópicos com pelo menos 100 comentários.',
+				usage: '!resumo'
+			},
+			{
+				trigger: '!ajuda',
+				shortcut: '',
+				category: 'utils',
+				description: 'Exibe a lista de comandos básicos e informações de suporte do bot.',
+				usage: '!ajuda'
+			}
+		];
+
+		// 3. Search and Tab Filtering
+		let currentCategory = 'all';
+		let currentSearchQuery = '';
+
+		const searchInput = document.getElementById('command-search');
+		const listContainer = document.getElementById('commands-list');
+
+		function renderCommands() {
+			listContainer.innerHTML = '';
+			
+			const filtered = commands.filter(cmd => {
+				const matchesCategory = (currentCategory === 'all' || cmd.category === currentCategory);
+				const searchLower = currentSearchQuery.toLowerCase();
+				const matchesSearch = (
+					cmd.trigger.toLowerCase().includes(searchLower) ||
+					cmd.shortcut.toLowerCase().includes(searchLower) ||
+					cmd.description.toLowerCase().includes(searchLower)
+				);
+				return matchesCategory && matchesSearch;
+			});
+
+			if (filtered.length === 0) {
+				listContainer.innerHTML = '<div class="no-results">Nenhum comando correspondente encontrado. Tente buscar por outros termos!</div>';
+				return;
+			}
+
+			filtered.forEach(cmd => {
+				const shortcutText = cmd.shortcut ? ` (atalho: ${cmd.shortcut})` : '';
+				listContainer.innerHTML += `
+					<div class="command-item">
+						<div class="command-header">
+							<div class="command-trigger">${cmd.trigger} <small>${shortcutText}</small></div>
+							<div class="command-cat-badge">${cmd.category}</div>
+						</div>
+						<p class="command-description">${cmd.description}</p>
+						<div class="command-usage">Uso: ${cmd.usage}</div>
+					</div>
+				`;
+			});
+		}
+
+		// Input listener
+		searchInput.addEventListener('input', (e) => {
+			currentSearchQuery = e.target.value.trim();
+			renderCommands();
+		});
+
+		// Tabs listeners
+		document.querySelectorAll('.tab-btn').forEach(btn => {
+			btn.addEventListener('click', () => {
+				document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+				btn.classList.add('active');
+				currentCategory = btn.getAttribute('data-category');
+				renderCommands();
+			});
+		});
+
+		// Initial load
+		window.addEventListener('DOMContentLoaded', () => {
+			renderCommands();
+		});
+	</script>
+</body>
+</html>

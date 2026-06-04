@@ -52,6 +52,10 @@ const MembersSchema = new mongoose.Schema<IMembers>(
 			type: 'string',
 			required: false,
 		},
+		customBadges: {
+			type: ['string'],
+			default: [],
+		},
 	},
 	{ collection: 'members' }
 )

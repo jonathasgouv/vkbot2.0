@@ -47,6 +47,28 @@ jest.mock('@models/ProcessedEvent', () => {
 	}
 })
 
+const mockFindOneQuiz = jest.fn().mockResolvedValue(null)
+jest.mock('@models/Quiz', () => {
+	return {
+		__esModule: true,
+		default: {
+			findOne: (...args: any[]) => mockFindOneQuiz(...args),
+		}
+	}
+})
+
+const mockUpdateOneMember = jest.fn().mockResolvedValue({})
+const mockUpdateManyMembers = jest.fn().mockResolvedValue({})
+jest.mock('@models/Member', () => {
+	return {
+		__esModule: true,
+		default: {
+			updateOne: (...args: any[]) => mockUpdateOneMember(...args),
+			updateMany: (...args: any[]) => mockUpdateManyMembers(...args),
+		}
+	}
+})
+
 const mockExecCommand = jest.fn()
 const mockGetCommand = jest.fn()
 const mockIsBolaoTopic = jest.fn()
@@ -83,6 +105,9 @@ describe('hookController', () => {
 		}
 		process.env.SECRET = 'my_secret'
 		process.env.BANNED_IDS = '[]'
+		mockFindOneQuiz.mockResolvedValue(null)
+		mockUpdateOneMember.mockResolvedValue({})
+		mockUpdateManyMembers.mockResolvedValue({})
 	})
 
 	describe('post', () => {

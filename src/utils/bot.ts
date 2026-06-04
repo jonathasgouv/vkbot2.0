@@ -317,6 +317,7 @@ export default {
 			desmonitorar: this.desmonitorarKeyword,
 			monitorados: this.listarKeywords,
 			rankingcopa: this.sendCopaRanking,
+			neto: this.sendNetoReply,
 		}
 
 		// Shorthand versions of commands
@@ -340,6 +341,7 @@ export default {
 			mons: 'monitorados',
 			rkcopa: 'rankingcopa',
 			rkc: 'rankingcopa',
+			n: 'neto',
 		}
 
 		// If it is a shorthand transpiles it to complete version
@@ -539,6 +541,7 @@ export default {
 			{ $sort: { totalPoints: -1 } },
 			{ $limit: 1 }
 		])
+
 		if (bolaoRanking.length > 0) {
 			const topPoints = bolaoRanking[0].totalPoints
 			if (topPoints > 0) {
@@ -553,7 +556,106 @@ export default {
 			}
 		}
 
+		// 1. Copa do Mundo 2026 Bolão top 3 badges
+		const copaRounds = await BolaoRound.find({ cmmId, championshipName: 'Copa do Mundo 2026' })
+		if (copaRounds && copaRounds.length > 0) {
+			const copaRoundIds = copaRounds.map(r => r._id)
+			const copaRanking = await Bet.aggregate([
+				{ $match: { roundId: { $in: copaRoundIds }, processed: true } },
+				{ $group: { _id: '$userId', totalPoints: { $sum: '$points' } } },
+				{ $sort: { totalPoints: -1 } },
+				{ $limit: 3 }
+			])
+			if (copaRanking && copaRanking.length > 0) {
+				const top1 = copaRanking[0]._id
+				const top2 = copaRanking[1]?._id
+				const top3 = copaRanking[2]?._id
+
+				if (userId === top1) badges.push('🥇 Copa Ouro (Vencedor do Bolão da Copa)')
+				if (userId === top2) badges.push('🥈 Copa Prata (Vice-líder do Bolão da Copa)')
+				if (userId === top3) badges.push('🥉 Copa Bronze (3º colocado do Bolão da Copa)')
+			}
+		}
+
+		// 2. 🐢 Devagar e Sempre (Palpitou em todos os jogos de uma rodada sem acertar nenhum placar exato)
+		const processedRounds = await BolaoRound.find({ cmmId, processed: true })
+		if (processedRounds && processedRounds.length > 0) {
+			for (const round of processedRounds) {
+				const gameCount = round.games?.length || 0
+				if (gameCount > 0) {
+					const userBets = await Bet.find({ userId, roundId: round._id })
+					if (userBets && userBets.length === gameCount) {
+						const hasExact = userBets.some(b => b.points === 5)
+						if (!hasExact) {
+							badges.push('🐢 Devagar e Sempre (Palpitou em todos os jogos de uma rodada sem acertar placar exato)')
+							break
+						}
+					}
+				}
+			}
+		}
+
+		// 3. 🎯 Profeta (Acertou placar exato de clássico)
+		const peDeAnjoBets = await Bet.find({ userId, points: 5 })
+		if (peDeAnjoBets && peDeAnjoBets.length > 0) {
+			const roundIds = peDeAnjoBets.map(b => b.roundId)
+			const rounds = await BolaoRound.find({ _id: { $in: roundIds } })
+			if (rounds && rounds.length > 0) {
+				const roundsMap = new Map(rounds.map(r => [r._id, r]))
+
+				for (const bet of peDeAnjoBets) {
+					const round = roundsMap.get(bet.roundId)
+					const game = round?.games?.find(g => g.id_jogo === bet.gameId)
+					if (game && this.isClassic(game.homeTeam, game.awayTeam)) {
+						badges.push('🎯 Profeta (Acertou placar exato de um Clássico)')
+						break
+					}
+				}
+			}
+		}
+
+		// 4. Custom badges earned via events (Quiz, Mural mentions, etc.)
+		if (member?.customBadges && member.customBadges.length > 0) {
+			badges.push(...member.customBadges)
+		}
+
 		return badges
+	},
+
+	isClassic(teamA: string, teamB: string): boolean {
+		if (!teamA || !teamB) return false
+		const normA = teamA.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+		const normB = teamB.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+
+		const classics = [
+			['corinthians', 'palmeiras'],
+			['corinthians', 'sao paulo'],
+			['corinthians', 'santos'],
+			['palmeiras', 'sao paulo'],
+			['palmeiras', 'santos'],
+			['sao paulo', 'santos'],
+			['flamengo', 'vasco'],
+			['flamengo', 'fluminense'],
+			['flamengo', 'botafogo'],
+			['vasco', 'fluminense'],
+			['vasco', 'botafogo'],
+			['fluminense', 'botafogo'],
+			['gremio', 'internacional'],
+			['atletico', 'cruzeiro'],
+			['atletico-mg', 'cruzeiro'],
+			['atletico pr', 'cruzeiro'],
+			['atletico-pr', 'cruzeiro'],
+			['bahia', 'vitoria'],
+			['ceara', 'fortaleza'],
+			['athletico', 'coritiba'],
+			['athletico-pr', 'coritiba'],
+			['athletico pr', 'coritiba'],
+		]
+
+		return classics.some(([t1, t2]) => 
+			(normA.includes(t1) && normB.includes(t2)) || 
+			(normA.includes(t2) && normB.includes(t1))
+		)
 	},
 
 	async sendProfile(data: ICommandsInput): Promise<void> {
@@ -1706,6 +1808,73 @@ Link: https://vk.com/topic-${cmmId}_${topicId}?post=${postId}`
 			}
 		} catch (error) {
 			console.error('Erro ao escanear palavras-chave:', error)
+		}
+	},
+
+	async sendNetoReply(data: ICommandsInput): Promise<void> {
+		const { topicId, cmmId, postId, userId, message } = data
+		const params = this.getCommandParameters(message)
+		const isMessage = params?.includes('m') || data.isPrivate
+		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
+
+		const question = message
+			.replaceAll(/!(neto|n)/gm, '')
+			.replaceAll(/-[a-z]/gm, '')
+			.trim()
+
+		if (!question) {
+			const responseText = `${quote} Diga aí o que você quer saber, garotinho! Se não, como é que eu vou te responder?`
+			isMessage
+				? await vkApi.messages.send({ peerId: userId, message: responseText })
+				: await vkApi.board.createComment({ topicId, cmmId, text: responseText })
+			return
+		}
+
+		try {
+			const geminiKey = process.env.GEMINI_API_KEY
+			if (!geminiKey) {
+				throw new Error('Chave de API do Gemini (GEMINI_API_KEY) não configurada.')
+			}
+
+			const systemInstruction = `Você é o ex-jogador Craque Neto. Você responde a perguntas de futebol de forma extremamente sincera, engraçada, indignada e carismática. 
+Use jargões icônicos e gírias típicas de Neto, como:
+- "Guri" / "Garotinho"
+- "Orelhudo"
+- "Pão com ovo!"
+- "Você tá de brincadeira!"
+- "Você é um bobão!"
+- "O que eu joguei no Guarani, no Corinthians..."
+- "Cascão!"
+- "Não joga nada!"
+Fale sobre futebol brasileiro com paixão e seja sempre clubista em relação ao Corinthians quando couber, de forma irônica. 
+Mantenha a resposta curta, direta e enérgica (no máximo 1 ou 2 parágrafos).`
+
+			const prompt = `Pergunta: ${question}\n\nResposta do Craque Neto:`
+
+			const geminiResponse = await axios.post(
+				`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiKey}`,
+				{
+					contents: [{ parts: [{ text: prompt }] }],
+					systemInstruction: { parts: [{ text: systemInstruction }] }
+				}
+			)
+
+			const responseText = geminiResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text
+			if (!responseText) {
+				throw new Error('Falha ao obter resposta do Neto da IA.')
+			}
+
+			const text = `${quote}\n${responseText.trim()}`
+
+			isMessage
+				? await vkApi.messages.send({ peerId: userId, message: text })
+				: await vkApi.board.createComment({ topicId, cmmId, text })
+		} catch (error) {
+			console.error('Erro no comando neto:', error)
+			const text = `${quote} ❌ O Craque Neto ficou indignado e não conseguiu responder agora!`
+			isMessage
+				? await vkApi.messages.send({ peerId: userId, message: text })
+				: await vkApi.board.createComment({ topicId, cmmId, text })
 		}
 	},
 }

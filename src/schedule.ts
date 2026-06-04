@@ -5,6 +5,9 @@ import topics from '@crons/topics'
 import bolao from '@crons/bolao'
 import comments from '@crons/comments'
 import copa from '@crons/copa'
+import mural from '@crons/mural'
+import quiz from '@crons/quiz'
+import resenha from '@crons/resenha'
 
 cron.schedule('* * * * *', () => reminder.sendResponses(), {
 	scheduled: true,
@@ -35,6 +38,22 @@ cron.schedule('15 2 * * *', () => copa.checkAndCreateNextCopaRound(), {
 	timezone: 'America/Sao_Paulo',
 })
 cron.schedule('30 * * * *', () => copa.resolveCopaRoundBets(), {
+	scheduled: true,
+	timezone: 'America/Sao_Paulo',
+})
+cron.schedule('0 9 * * MON', () => mural.createWeeklyMural(), {
+	scheduled: true,
+	timezone: 'America/Sao_Paulo',
+})
+cron.schedule('0 18 * * *', () => quiz.postDailyQuiz(), {
+	scheduled: true,
+	timezone: 'America/Sao_Paulo',
+})
+cron.schedule('* * * * *', () => quiz.checkQuizTimeout(), {
+	scheduled: true,
+	timezone: 'America/Sao_Paulo',
+})
+cron.schedule('0 12 * * TUE', () => resenha.createRoundResenha(), {
 	scheduled: true,
 	timezone: 'America/Sao_Paulo',
 })

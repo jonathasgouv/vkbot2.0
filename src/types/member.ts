@@ -11,4 +11,5 @@ export default interface IMember {
 	firstName?: string
 	lastName?: string
 	photoUrl?: string
+	customBadges?: string[]
 }

@@ -37,6 +37,20 @@ export default {
 			return response.data.response
 		},
 
+		async editTopic(data: { cmmId: number; topicId: number; title: string }) {
+			const queryParams = {
+				group_id: data.cmmId,
+				topic_id: data.topicId,
+				title: data.title,
+			}
+
+			const response = await vkApi.get('/board.editTopic', {
+				params: queryParams,
+			})
+
+			return response.data.response
+		},
+
 		async getTopics(data: IGetTopicsComments) {
 			const topicIds = data.topicIds?.join(',')
 

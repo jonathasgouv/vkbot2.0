@@ -393,6 +393,9 @@ if (process.env.NODE_ENV !== 'test') {
 		import('@crons/comments')
 			.then((m) => m.default.syncCommentsAndLikes())
 			.catch((err) => console.error('Error in startup comments sync:', err))
+		import('@crons/quiz')
+			.then((m) => m.default.bootstrapQuizForCurrentWeek())
+			.catch((err) => console.error('Error in startup quiz bootstrap:', err))
 	})
 }
 

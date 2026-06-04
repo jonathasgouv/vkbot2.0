@@ -97,12 +97,14 @@ jest.mock('@models/Reminder', () => {
 
 const mockFindOneBet = jest.fn()
 const mockAggregateBet = jest.fn()
+const mockFindBet = jest.fn().mockResolvedValue([])
 jest.mock('@models/Bet', () => {
 	return {
 		__esModule: true,
 		default: {
 			findOne: mockFindOneBet,
 			aggregate: mockAggregateBet,
+			find: (...args: any[]) => mockFindBet(...args),
 		}
 	}
 })

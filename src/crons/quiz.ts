@@ -119,7 +119,7 @@ export default {
 				// Create topic on VK
 				const topic = await vkApi.board.addTopic({
 					cmmId,
-					title: `⚽ QUIZ VKBot - Semana de ${todayStr}`,
+					title: `QUIZ - Semana de ${todayStr}`,
 					text: `⚽ *BEM-VINDO AO SUPER QUIZ VKBOT!* ⚽\n\nToda noite às 18:00 BRT, teremos uma rodada de 10 perguntas diárias sobre futebol.\nO primeiro membro que acertar cada pergunta acumula pontos para a rodada e para o ranking da semana!\n\nParticipe comentando o palpite exato da pergunta ativa. Boa sorte!`
 				})
 
@@ -282,7 +282,7 @@ export default {
 						await vkApi.board.editTopic({
 							cmmId: quiz.cmmId,
 							topicId: quiz.topicId,
-							title: `[ENCERRADO] ⚽ QUIZ VKBot - Semana de ${todayStr}`
+							title: `[ENCERRADO] QUIZ - Semana de ${todayStr}`
 						}).catch((e) => console.error('Erro ao renomear tópico para encerrado:', e))
 
 						// Save overall winner id to quiz
@@ -309,7 +309,7 @@ export default {
 					
 					const topic = await vkApi.board.addTopic({
 						cmmId,
-						title: `⚽ QUIZ VKBot - Semana de ${todayStr}`,
+						title: `QUIZ - Semana de ${todayStr}`,
 						text: `⚽ *BEM-VINDO AO SUPER QUIZ VKBOT!* ⚽\n\nToda noite às 18:00 BRT, teremos uma rodada de 10 perguntas diárias sobre futebol.\nO primeiro membro que acertar cada pergunta acumula pontos para a rodada e para o ranking da semana!\n\nParticipe comentando o palpite exato da pergunta ativa. Boa sorte!`
 					})
 

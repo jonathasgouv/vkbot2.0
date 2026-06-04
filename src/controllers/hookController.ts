@@ -187,7 +187,7 @@ export default {
 													await vkApi.board.editTopic({
 														cmmId,
 														topicId,
-														title: `[ENCERRADO] ⚽ QUIZ VKBot - Semana de ${todayStr}`
+														title: `[ENCERRADO] QUIZ - Semana de ${todayStr}`
 													}).catch((e) => console.error('Erro ao renomear para encerrado:', e))
 
 													activeQuiz.winnerId = winnerId

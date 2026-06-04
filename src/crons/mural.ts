@@ -285,7 +285,7 @@ export default {
 				const todayStr = new Date().toLocaleDateString('pt-BR')
 				await vkApi.board.addTopic({
 					cmmId,
-					title: `🏆 Mural de Destaques da Semana - ${todayStr}`,
+					title: `OFF -🏆 Mural de Destaques da Semana - ${todayStr}`,
 					text: muralText
 				})
 

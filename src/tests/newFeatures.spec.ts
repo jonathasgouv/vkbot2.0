@@ -584,7 +584,7 @@ describe('New Features Integration Tests', () => {
 			)
 			expect(mockAddTopic).toHaveBeenCalledWith(expect.objectContaining({
 				cmmId: 100,
-				title: '⚽ Resenha da Rodada - Rodada 22 (Bolão)',
+				title: 'OFF -⚽ Resenha da Rodada - Rodada 22 (Bolão)',
 				text: expect.stringContaining('Neto analisando a rodada!')
 			}))
 		})

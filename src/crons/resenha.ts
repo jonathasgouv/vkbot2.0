@@ -185,7 +185,7 @@ export default {
 				// Create Topic
 				await vkApi.board.addTopic({
 					cmmId,
-					title: `⚽ Resenha da Rodada - Rodada ${round.roundNumber} (Bolão)`,
+					title: `OFF -⚽ Resenha da Rodada - Rodada ${round.roundNumber} (Bolão)`,
 					text: resenhaText
 				})
 

@@ -296,7 +296,7 @@ export default {
 		return reminderDate
 	},
 
-	async execCommand(command: string, userId: number, topicId: number, postId: number, cmmId: number, message: string): Promise<void> {
+	async execCommand(command: string, userId: number, topicId: number, postId: number, cmmId: number, message: string, isPrivate?: boolean): Promise<void> {
 		const fncts: any = {
 			citar: this.quotePost,
 			tag: this.quotePostWithTag,
@@ -354,13 +354,14 @@ export default {
 			userId,
 			topicId,
 			message,
+			isPrivate,
 		})
 	},
 
 	async quotePost(data: ICommandsInput): Promise<void> {
 		const { topicId, cmmId, postId, userId, message } = data
 		const params = this.getCommandParameters(message)
-		const isMessage = params?.includes('m')
+		const isMessage = params?.includes('m') || data.isPrivate
 
 		if (isMessage) return this.sendMessage(data)
 
@@ -372,7 +373,7 @@ export default {
 	async quotePostWithTag(data: ICommandsInput): Promise<void> {
 		const { userId, postId, topicId, cmmId, message } = data
 		const params = this.getCommandParameters(message)
-		const isMessage = params?.includes('m')
+		const isMessage = params?.includes('m') || data.isPrivate
 
 		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
 		const tag = (message.split('!tag')[1] || message.split('!t')[1])?.replace('-m', '').trim()
@@ -408,7 +409,7 @@ export default {
 	async sendGames(data: ICommandsInput): Promise<void> {
 		const { topicId, cmmId, postId, userId, message } = data
 		const params = this.getCommandParameters(message)?.sort()
-		const isMessage = params?.includes('m')
+		const isMessage = params?.includes('m') || data.isPrivate
 		const serie = ['a', 'b', 'c', 'd'].includes(params?.[0]) ? params[0] : undefined
 
 		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
@@ -424,7 +425,7 @@ export default {
 	async remindMe(data: ICommandsInput): Promise<void> {
 		const { topicId, cmmId, postId, userId, message } = data
 		const params = this.getCommandParameters(message)
-		const isMessage = params?.includes('m')
+		const isMessage = params?.includes('m') || data.isPrivate
 
 		const reminderDate = this.getReminderDate(message)
 
@@ -464,7 +465,7 @@ export default {
 	async searchTopic(data: ICommandsInput): Promise<void> {
 		const { topicId, cmmId, message, userId, postId } = data
 		const params = this.getCommandParameters(message)
-		const isMessage = params?.includes('m')
+		const isMessage = params?.includes('m') || data.isPrivate
 		const isText = params?.includes('c')
 		const isTitle = params?.includes('t')
 		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
@@ -558,7 +559,7 @@ export default {
 	async sendProfile(data: ICommandsInput): Promise<void> {
 		const { topicId, cmmId, userId, postId, message } = data
 		const params = this.getCommandParameters(message)
-		const isMessage = params?.includes('m')
+		const isMessage = params?.includes('m') || data.isPrivate
 
 		// 1. Obter nome/tag do usuário
 		const userTag = await this.getTagString(userId)
@@ -683,7 +684,7 @@ ${badgesList}`
 	async sendComparison(data: ICommandsInput): Promise<void> {
 		const { topicId, cmmId, userId, postId, message } = data
 		const params = this.getCommandParameters(message)
-		const isMessage = params?.includes('m')
+		const isMessage = params?.includes('m') || data.isPrivate
 		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
 
 		const match = message.match(/\[id(\d+)\|/i) || message.match(/id(\d+)/i) || message.match(/!vs\s+(\d+)/i)
@@ -881,7 +882,7 @@ ${badgesList}`
 	async sendTopicSummary(data: ICommandsInput): Promise<void> {
 		const { topicId, cmmId, postId, userId, message } = data
 		const params = this.getCommandParameters(message)
-		const isMessage = params?.includes('m')
+		const isMessage = params?.includes('m') || data.isPrivate
 		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
 
 		try {
@@ -1033,7 +1034,7 @@ ${formattedMessages}
 Resumo:`
 
 			const geminiResponse = await axios.post(
-				`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`,
+				`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiKey}`,
 				{
 					contents: [{ parts: [{ text: prompt }] }]
 				}
@@ -1145,7 +1146,7 @@ Resumo:`
 			return this.sendCopaRanking(data)
 		}
 		const params = this.getCommandParameters(message)
-		const isMessage = params?.includes('m')
+		const isMessage = params?.includes('m') || data.isPrivate
 		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
 
 		try {
@@ -1219,7 +1220,7 @@ Resumo:`
 	async sendCopaRanking(data: ICommandsInput): Promise<void> {
 		const { topicId, cmmId, postId, userId, message } = data
 		const params = this.getCommandParameters(message)
-		const isMessage = params?.includes('m')
+		const isMessage = params?.includes('m') || data.isPrivate
 		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
 
 		try {
@@ -1292,7 +1293,7 @@ Resumo:`
 	async sendRpgRanking(data: ICommandsInput): Promise<void> {
 		const { topicId, cmmId, postId, userId, message } = data
 		const params = this.getCommandParameters(message)
-		const isMessage = params?.includes('m')
+		const isMessage = params?.includes('m') || data.isPrivate
 		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
 
 		try {
@@ -1412,7 +1413,7 @@ Resumo:`
 	async sendBolaoLink(data: ICommandsInput): Promise<void> {
 		const { topicId, cmmId, postId, userId, message } = data
 		const params = this.getCommandParameters(message)
-		const isMessage = params?.includes('m')
+		const isMessage = params?.includes('m') || data.isPrivate
 		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
 
 		try {
@@ -1441,7 +1442,7 @@ Resumo:`
 	async searchWiki(data: ICommandsInput): Promise<void> {
 		const { topicId, cmmId, postId, userId, message } = data
 		const params = this.getCommandParameters(message)
-		const isMessage = params?.includes('m')
+		const isMessage = params?.includes('m') || data.isPrivate
 		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
 
 		const query = message
@@ -1489,7 +1490,8 @@ Resumo:`
 			return this.desmonitorarKeyword(data)
 		}
 
-		const quote = await this.getQuoteString(postId, userId)
+		const isMessage = params?.includes('m') || data.isPrivate
+		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
 		
 		// Extract raw keyword by removing command (!monitorar or !mon) and options (-e, -d, etc.)
 		const keyword = message
@@ -1499,7 +1501,9 @@ Resumo:`
 
 		if (!keyword) {
 			const text = `${quote} ⚠️ Por favor, insira um termo para monitorar. Exemplo: !monitorar ingresso`
-			await vkApi.board.createComment({ topicId, cmmId, text })
+			isMessage
+				? await vkApi.messages.send({ peerId: userId, message: text })
+				: await vkApi.board.createComment({ topicId, cmmId, text })
 			return
 		}
 
@@ -1508,7 +1512,9 @@ Resumo:`
 			const count = await Keyword.countDocuments({ userId, cmmId })
 			if (count >= 5) {
 				const text = `${quote} ⚠️ Limite de 5 palavras-chave atingido. Use !monitorados para listar e !desmonitorar <termo> para remover alguma.`
-				await vkApi.board.createComment({ topicId, cmmId, text })
+				isMessage
+					? await vkApi.messages.send({ peerId: userId, message: text })
+					: await vkApi.board.createComment({ topicId, cmmId, text })
 				return
 			}
 
@@ -1522,7 +1528,9 @@ Resumo:`
 				// VK API throws when user hasn't allowed messages
 				console.info(`Falha ao testar DM para usuário ${userId}:`, dmError)
 				const text = `${quote} ⚠️ Não consegui te enviar uma mensagem privada.\nPara receber alertas de monitoramento, você precisa abrir um chat com o bot (iniciar conversa/enviar mensagem) e tentar registrar o termo novamente.`
-				await vkApi.board.createComment({ topicId, cmmId, text })
+				isMessage
+					? await vkApi.messages.send({ peerId: userId, message: text })
+					: await vkApi.board.createComment({ topicId, cmmId, text })
 				return
 			}
 
@@ -1541,17 +1549,23 @@ Resumo:`
 
 			const mode = isExact ? 'Exata' : 'Parcial'
 			const text = `${quote} ✅ Monitoramento da palavra-chave "${keyword}" (${mode}) ativado com sucesso! Você receberá alertas no privado.`
-			await vkApi.board.createComment({ topicId, cmmId, text })
+			isMessage
+				? await vkApi.messages.send({ peerId: userId, message: text })
+				: await vkApi.board.createComment({ topicId, cmmId, text })
 		} catch (error) {
 			console.error('Erro no comando monitorar:', error)
 			const text = `${quote} ❌ Ocorreu um erro ao tentar salvar o monitoramento.`
-			await vkApi.board.createComment({ topicId, cmmId, text })
+			isMessage
+				? await vkApi.messages.send({ peerId: userId, message: text })
+				: await vkApi.board.createComment({ topicId, cmmId, text })
 		}
 	},
 
 	async desmonitorarKeyword(data: ICommandsInput): Promise<void> {
 		const { topicId, cmmId, postId, userId, message } = data
-		const quote = await this.getQuoteString(postId, userId)
+		const params = this.getCommandParameters(message)
+		const isMessage = params?.includes('m') || data.isPrivate
+		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
 		
 		const keyword = message
 			.replaceAll(/!(desmonitorar|dmon|monitorar|mon)/gm, '')
@@ -1560,7 +1574,9 @@ Resumo:`
 
 		if (!keyword) {
 			const text = `${quote} ⚠️ Por favor, insira o termo que deseja desmonitorar. Exemplo: !desmonitorar ingresso`
-			await vkApi.board.createComment({ topicId, cmmId, text })
+			isMessage
+				? await vkApi.messages.send({ peerId: userId, message: text })
+				: await vkApi.board.createComment({ topicId, cmmId, text })
 			return
 		}
 
@@ -1573,28 +1589,38 @@ Resumo:`
 
 			if (result.deletedCount === 0) {
 				const text = `${quote} ⚠️ Você não está monitorando a palavra-chave "${keyword}".`
-				await vkApi.board.createComment({ topicId, cmmId, text })
+				isMessage
+					? await vkApi.messages.send({ peerId: userId, message: text })
+					: await vkApi.board.createComment({ topicId, cmmId, text })
 			} else {
 				const text = `${quote} ❌ Monitoramento da palavra-chave "${keyword}" removido.`
-				await vkApi.board.createComment({ topicId, cmmId, text })
+				isMessage
+					? await vkApi.messages.send({ peerId: userId, message: text })
+					: await vkApi.board.createComment({ topicId, cmmId, text })
 			}
 		} catch (error) {
 			console.error('Erro no comando desmonitorar:', error)
 			const text = `${quote} ❌ Ocorreu um erro ao tentar remover o monitoramento.`
-			await vkApi.board.createComment({ topicId, cmmId, text })
+			isMessage
+				? await vkApi.messages.send({ peerId: userId, message: text })
+				: await vkApi.board.createComment({ topicId, cmmId, text })
 		}
 	},
 
 	async listarKeywords(data: ICommandsInput): Promise<void> {
-		const { topicId, cmmId, postId, userId } = data
-		const quote = await this.getQuoteString(postId, userId)
+		const { topicId, cmmId, postId, userId, message } = data
+		const params = this.getCommandParameters(message)
+		const isMessage = params?.includes('m') || data.isPrivate
+		const quote = !isMessage ? await this.getQuoteString(postId, userId) : ''
 
 		try {
 			const userKeywords = await Keyword.find({ userId, cmmId }).sort({ createdAt: 1 })
 
 			if (userKeywords.length === 0) {
 				const text = `${quote} Você não tem nenhuma palavra-chave cadastrada para monitoramento nesta comunidade.`
-				await vkApi.board.createComment({ topicId, cmmId, text })
+				isMessage
+					? await vkApi.messages.send({ peerId: userId, message: text })
+					: await vkApi.board.createComment({ topicId, cmmId, text })
 				return
 			}
 
@@ -1604,11 +1630,15 @@ Resumo:`
 			})
 
 			const text = `${quote} Suas palavras-chave monitoradas nesta comunidade:\n\n${lines.join('\n')}\n\nUse !desmonitorar <termo> para remover.`
-			await vkApi.board.createComment({ topicId, cmmId, text })
+			isMessage
+				? await vkApi.messages.send({ peerId: userId, message: text })
+				: await vkApi.board.createComment({ topicId, cmmId, text })
 		} catch (error) {
 			console.error('Erro ao listar palavras-chave:', error)
 			const text = `${quote} ❌ Ocorreu um erro ao tentar buscar suas palavras-chave.`
-			await vkApi.board.createComment({ topicId, cmmId, text })
+			isMessage
+				? await vkApi.messages.send({ peerId: userId, message: text })
+				: await vkApi.board.createComment({ topicId, cmmId, text })
 		}
 	},
 

@@ -144,5 +144,18 @@ export default {
 
 			return response.data.response
 		},
+
+		async isMember(data: { groupId: number; userId: number }) {
+			const queryParams = {
+				group_id: data.groupId,
+				user_id: data.userId,
+			}
+
+			const response = await vkApi.get('/groups.isMember', {
+				params: queryParams,
+			})
+
+			return response.data.response
+		},
 	},
 }

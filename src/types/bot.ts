@@ -4,4 +4,5 @@ export default interface ICommandsInput {
 	postId: number
 	cmmId: number
 	message: string
+	isPrivate?: boolean
 }

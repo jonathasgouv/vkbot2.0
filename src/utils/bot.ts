@@ -9,6 +9,7 @@ import BolaoRound from '@models/BolaoRound'
 import Bet from '@models/Bet'
 import Keyword from '@models/Keyword'
 import axios from 'axios'
+import { httpAgent, httpsAgent } from '@config/axios'
 import type ICommandsInput from '@appTypes/bot'
 import type ITopic from '@appTypes/topic'
 
@@ -1127,28 +1128,48 @@ ${badgesList}`
 				throw new Error('Chave de API do Gemini (GEMINI_API_KEY) não configurada.')
 			}
 
-			const prompt = `Você é um assistente de moderação de fórum. Abaixo estão as postagens iniciais e finais de uma discussão em nossa comunidade sobre Cartola FC e futebol.
-Escreva um resumo claro, conciso e direto em português (máximo de 2 a 3 parágrafos) destacando os principais tópicos debatidos pelos membros, as opiniões predominantes e os destaques.
+			const systemInstruction = `Você é o "robonaldo", um robô corneteiro e estatístico sarcástico que é a inteligência artificial oficial deste fórum de futebol.
+Seu tom é extremamente irônico, superior, debochado e sarcástico. Você se considera muito inteligente e trata os outros com um deboche amigável, mas ácido.
 
-Comentários do tópico:
-${formattedMessages}
+Você deve usar ativamente as seguintes gírias e piadas internas da comunidade em suas respostas (NUNCA coloque gírias, termos ou nomes em negrito ou com asteriscos, ex: use chimpa, nunca *chimpa*):
+- "chimpa" (indivíduo burro, sem modos, de QI baixo).
+- "12" (significa imagem ou foto. Ex: "cadê a 12?").
+- "apae" (usado como sinônimo de lerdo/desprovido de inteligência ou informalmente como pronome de tratamento, ex: "tudo bem, apae?").
+- "salgado" / "sal" / "salgou" (alguém ousado, que se destaca ou que mandou muito bem).
+- "goec" (ataque em grupo, linchamento virtual do fórum. Ex: "caso de GOEC" ou "merece um GOEC").
+- "famoso who" (indivíduo ou jogador totalmente desconhecido).
+- "sangrar" / "sangrou" (ficar muito irritado, pegar ar, perder a linha).
+- "- cumm" (sufixo irônico usado em nova linha após citar uma opinião coletiva que você acha burra ou errada, ex: "cuzil vai ganhar a Copa\\n - cumm").
+- Prefixo "cu-" depreciativo para nomes (ex: "cuzil" para Brasil, "cunaldo" para Ronaldo, etc. de forma irônica).
 
-Resumo:`
+Ao gerar o resumo da discussão do tópico, siga este estilo:
+1. Faça um resumo fiel dos pontos debatidos pelos membros, destacando as opiniões predominantes e discussões sobre Cartola e futebol, mas com muito sarcasmo, ironia e acidez.
+2. Identifique quem "sangrou" na discussão, quem "salgou" (se destacou), quem é tratado como "famoso who" e quem está merecendo um "GOEC".
+3. Feche o resumo com no máximo 2 a 3 parágrafos curtos.
+4. Retorne APENAS texto puro. NÃO use nenhuma formatação markdown (como asteriscos '*' para negrito/itálico, hashtags '#' para títulos ou traços para listas com marcadores). É CRÍTICO que você não use nenhum asterisco (*).
+5. Sempre assine no final como: "— robonaldo 🤖"`
+
+			const prompt = `Comentários do tópico:\n${formattedMessages}\n\nResumo:`
 
 			const geminiResponse = await axios.post(
 				`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiKey}`,
 				{
-					contents: [{ parts: [{ text: prompt }] }]
-				}
+					contents: [{ parts: [{ text: prompt }] }],
+					systemInstruction: { parts: [{ text: systemInstruction }] }
+				},
+				{ timeout: 15000, httpAgent, httpsAgent }
 			)
 
-			const summary = geminiResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text
+			let summary = geminiResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text
 			if (!summary) {
 				throw new Error('Falha ao obter o resumo da IA.')
 			}
 
+			// Remover quaisquer asteriscos redundantes que a IA possa ter gerado
+			summary = summary.replace(/\*/g, '')
+
 			// 10. Responder no fórum e setar cooldown
-			const responseText = `${quote}\n📝 *Resumo do Tópico (IA)* 📝\n\n${summary.trim()}`
+			const responseText = `${quote}\n📝 Resumo do Tópico (IA) 📝\n\n${summary.trim()}`
 
 			isMessage
 				? await vkApi.messages.send({ peerId: userId, message: responseText })
@@ -1759,10 +1780,7 @@ Resumo:`
 			const keywords = await Keyword.find({ cmmId, userId: { $ne: authorId } })
 			if (keywords.length === 0) return
 
-			// 2. Resolve topic title
-			const topicTitle = await this.getTopicTitle(cmmId, topicId)
-
-			// 3. Keep track of users we want to notify and the keyword that matched
+			// 2. Keep track of users we want to notify and the keyword that matched
 			// Use a map to notify each user only once per comment, even if multiple keywords match
 			const notifications = new Map<number, string>()
 
@@ -1784,8 +1802,11 @@ Resumo:`
 				}
 			}
 
-			// 4. Send VK DM to matching users concurrently
+			// 3. Send VK DM to matching users concurrently
 			if (notifications.size > 0) {
+				// Resolve topic title only if there's at least one match
+				const topicTitle = await this.getTopicTitle(cmmId, topicId)
+
 				const promises = Array.from(notifications.entries()).map(async ([userId, kw]) => {
 					try {
 						// Clean preview comment to avoid huge DMs
@@ -1856,7 +1877,8 @@ Mantenha a resposta curta, direta e enérgica (no máximo 1 ou 2 parágrafos).`
 				{
 					contents: [{ parts: [{ text: prompt }] }],
 					systemInstruction: { parts: [{ text: systemInstruction }] }
-				}
+				},
+				{ timeout: 15000, httpAgent, httpsAgent }
 			)
 
 			const responseText = geminiResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text

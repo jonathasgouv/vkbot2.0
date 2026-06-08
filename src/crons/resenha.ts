@@ -1,8 +1,10 @@
 import Member from '@models/Member'
 import Bet from '@models/Bet'
 import BolaoRound from '@models/BolaoRound'
+import Topic from '@models/Topic'
 import vkApi from '@api/vk'
 import axios from 'axios'
+import { httpAgent, httpsAgent } from '@config/axios'
 
 const getResenhaText = async (
 	roundNumber: number,
@@ -39,7 +41,8 @@ Escreva a Resenha da Rodada:`
 			{
 				contents: [{ parts: [{ text: prompt }] }],
 				systemInstruction: { parts: [{ text: systemInstruction }] }
-			}
+			},
+			{ timeout: 15000, httpAgent, httpsAgent }
 		)
 
 		const generatedText = geminiResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text
@@ -193,6 +196,67 @@ export default {
 			}
 		} catch (error) {
 			console.error('Erro ao gerar resenha da rodada do bolão:', error)
+		}
+	},
+
+	async bootstrapResenhaForCurrentWeek(): Promise<void> {
+		try {
+			console.info('Running bootstrap check for Resenha da Rodada')
+
+			// Calcular a última terça-feira (dia em que o cron roda às 12h BRT)
+			const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+			const dayOfWeek = now.getDay() // 0=Dom, 1=Seg, 2=Ter, ...
+
+			// Só faz sentido verificar se já passou da terça-feira desta semana (dia 2)
+			if (dayOfWeek < 2) {
+				console.info('Resenha bootstrap: ainda não chegou a terça-feira desta semana. Nada a fazer.')
+				return
+			}
+
+			// Calcular o início da última terça-feira (meia-noite BRT)
+			const daysToLastTuesday = dayOfWeek - 2
+			const lastTuesday = new Date(now)
+			lastTuesday.setDate(now.getDate() - daysToLastTuesday)
+			lastTuesday.setHours(0, 0, 0, 0)
+
+			const cmms = await Member.distinct('cmmId')
+			let needsCreation = false
+
+			for (const cmmId of cmms) {
+				const existingResenha = await Topic.findOne({
+					cmmId,
+					title: { $regex: /Resenha da Rodada/i },
+					createdAt: { $gte: lastTuesday }
+				})
+
+				if (existingResenha) {
+					console.info(`Resenha bootstrap: tópico já existe para cmm ${cmmId} (${existingResenha.title}). Pulando.`)
+					continue
+				}
+
+				const round = await BolaoRound.findOne({
+					cmmId,
+					championshipName: 'Campeonato Brasileiro',
+					processed: true
+				}).sort({ roundNumber: -1 })
+
+				if (!round) {
+					console.info(`Resenha bootstrap: nenhuma rodada processada para cmm ${cmmId}.`)
+					continue
+				}
+
+				console.info(`Resenha bootstrap: resenha ausente para cmm ${cmmId} após ${lastTuesday.toDateString()}.`)
+				needsCreation = true
+			}
+
+			if (needsCreation) {
+				console.info('Resenha bootstrap: disparando createRoundResenha()')
+				await this.createRoundResenha()
+			} else {
+				console.info('Resenha bootstrap: todas as comunidades já têm resenha desta semana.')
+			}
+		} catch (error) {
+			console.error('Erro no bootstrap da resenha:', error)
 		}
 	}
 }

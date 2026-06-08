@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { httpAgent, httpsAgent } from '@config/axios'
 
 export interface IWikiSummary {
 	title: string
@@ -24,6 +25,8 @@ export default {
 				},
 				headers,
 				timeout: 10000,
+				httpAgent,
+				httpsAgent,
 			})
 
 			const searchResults = searchResponse.data?.query?.search
@@ -37,6 +40,8 @@ export default {
 			const summaryResponse = await axios.get(`https://pt.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`, {
 				headers,
 				timeout: 10000,
+				httpAgent,
+				httpsAgent,
 			})
 
 			const data = summaryResponse.data

@@ -396,6 +396,9 @@ if (process.env.NODE_ENV !== 'test') {
 		import('@crons/quiz')
 			.then((m) => m.default.bootstrapQuizForCurrentWeek())
 			.catch((err) => console.error('Error in startup quiz bootstrap:', err))
+		import('@crons/resenha')
+			.then((m) => m.default.bootstrapResenhaForCurrentWeek())
+			.catch((err) => console.error('Error in startup resenha bootstrap:', err))
 	})
 }
 

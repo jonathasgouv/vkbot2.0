@@ -2,9 +2,11 @@ import Quiz, { IQuiz } from '@models/Quiz'
 import Member from '@models/Member'
 import vkApi from '@api/vk'
 import axios from 'axios'
+import { httpAgent, httpsAgent } from '@config/axios'
 
 export const normalizeAnswer = (text: string): string => {
-	return text
+	const withoutMentions = text.replace(/\[(?:id|club)\d+\|[^\]]+\]/gi, '')
+	return withoutMentions
 		.toLowerCase()
 		.normalize('NFD')
 		.replace(/[\u0300-\u036f]/g, '') // Remove accents
@@ -14,8 +16,13 @@ export const normalizeAnswer = (text: string): string => {
 		.replace(/\s+/g, ' ') // Collapse whitespace
 }
 
+export const getSaoPauloDate = (): Date => {
+	const spString = new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' })
+	return new Date(spString)
+}
+
 export const getMondayOfCurrentWeek = (): Date => {
-	const today = new Date()
+	const today = getSaoPauloDate()
 	const day = today.getDay()
 	const diff = today.getDate() - day + (day === 0 ? -6 : 1) // adjust when day is sunday
 	const monday = new Date(today.setDate(diff))
@@ -59,6 +66,13 @@ export const generateWeeklyQuestions = async (): Promise<any[]> => {
 
 	const prompt = `Gere exatamente 7 dias de perguntas sobre curiosidades e história do futebol brasileiro e internacional (10 perguntas por dia, totalizando 70 perguntas).
 As perguntas devem ter dificuldade variada (fáceis, médias e difíceis) e respostas curtas e objetivas (geralmente uma única palavra, nome de jogador, nome de time ou número).
+
+Regras cruciais de validação e qualidade:
+1. **Fatos 100% Corretos**: Certifique-se de que a pergunta e a resposta são factualmente verdadeiras. Nunca invente dados ou atribua conquistas erradas (ex: não diga que o Independiente é um time brasileiro ou que Parreira é um técnico italiano).
+2. **Sem Contradições**: Verifique se as restrições da pergunta (ex: nacionalidade do jogador, país do clube) batem perfeitamente com a resposta.
+3. **Respostas Diretas e Curtas**: Use o nome mais comum e conhecido do jogador ou time (ex: use 'Parreira' em vez de 'Carlos Alberto Parreira', 'Pele' em vez de 'Edson Arantes do Nascimento', 'Gremio' em vez de 'Gremio Foot-Ball Porto Alegrense'). Não use respostas longas.
+4. **Sem Ambiguidade**: Evite perguntas onde possa existir mais de uma resposta correta, a menos que uma seja indiscutivelmente a mais famosa.
+
 O formato de retorno DEVE ser estritamente um array JSON válido, com o seguinte formato:
 [
   {
@@ -80,7 +94,8 @@ Retorne apenas o JSON puro, sem formatação markdown de código.`
 		`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${geminiKey}`,
 		{
 			contents: [{ parts: [{ text: prompt }] }]
-		}
+		},
+		{ timeout: 15000, httpAgent, httpsAgent }
 	)
 
 	let text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
@@ -104,47 +119,72 @@ export default {
 		try {
 			const cmms = await Member.distinct('cmmId')
 			const monday = getMondayOfCurrentWeek()
+			let cachedQuestions: any[] | null = null
 
 			for (const cmmId of cmms) {
-				// Check if already exists
-				const exists = await Quiz.findOne({ cmmId, weekStartDate: monday })
-				if (exists) {
-					console.info(`Quiz for week ${monday.toDateString()} already exists for cmm ${cmmId}`)
-					continue
-				}
+				try {
+					// Check if already exists
+					const exists = await Quiz.findOne({ cmmId, weekStartDate: monday })
+					if (exists) {
+						console.info(`Quiz for week ${monday.toDateString()} already exists for cmm ${cmmId}`)
+						continue
+					}
 
-				const parsed = await generateWeeklyQuestions()
-				const todayStr = monday.toLocaleDateString('pt-BR')
-				
-				// Create topic on VK
-				const topic = await vkApi.board.addTopic({
-					cmmId,
-					title: `QUIZ - Semana de ${todayStr}`,
-					text: `⚽ *BEM-VINDO AO SUPER QUIZ VKBOT!* ⚽\n\nToda noite às 18:00 BRT, teremos uma rodada de 10 perguntas diárias sobre futebol.\nO primeiro membro que acertar cada pergunta acumula pontos para a rodada e para o ranking da semana!\n\nParticipe comentando o palpite exato da pergunta ativa. Boa sorte!`
-				})
+					// Pre-verify board access before calling Gemini to prevent quota drain
+					try {
+						await vkApi.board.getTopics({ groupId: cmmId, count: 1 })
+					} catch (apiError: any) {
+						console.warn(`Skipping weekly quiz generation for cmm ${cmmId} due to board access issues:`, apiError.message || apiError)
+						continue
+					}
 
-				const topicId = topic // board.addTopic returns topic ID (number)
+					if (!cachedQuestions) {
+						cachedQuestions = await generateWeeklyQuestions()
+					}
+					const parsed = cachedQuestions
+					const todayStr = monday.toLocaleDateString('pt-BR')
+					
+					// Create topic on VK
+					let topicId: number
+					try {
+						const topic = await vkApi.board.addTopic({
+							cmmId,
+							title: `QUIZ - Semana de ${todayStr}`,
+							text: `⚽ *BEM-VINDO AO SUPER QUIZ VKBOT!* ⚽\n\nToda noite às 18:00 BRT, teremos uma rodada de 10 perguntas diárias sobre futebol.\nO primeiro membro que acertar cada pergunta acumula pontos para a rodada e para o ranking da semana!\n\nParticipe comentando o palpite exato da pergunta ativa. Boa sorte!`
+						})
+						topicId = topic // board.addTopic returns topic ID (number)
+					} catch (addError: any) {
+						if (addError.message?.includes('Access denied') || addError.error_code === 15) {
+							console.warn(`Access denied when creating quiz topic for cmm ${cmmId}. Marking as disabled.`)
+							topicId = -1
+						} else {
+							throw addError
+						}
+					}
 
-				const dailyBatches = parsed.map((d: any) => ({
-					dayIndex: d.dayIndex,
-					questions: d.questions.map((q: any) => ({
-						index: q.index,
-						question: q.question,
-						answer: q.answer,
-						status: 'pending'
+					const dailyBatches = parsed.map((d: any) => ({
+						dayIndex: d.dayIndex,
+						questions: d.questions.map((q: any) => ({
+							index: q.index,
+							question: q.question,
+							answer: q.answer,
+							status: 'pending'
+						}))
 					}))
-				}))
 
-				await Quiz.create({
-					cmmId,
-					topicId,
-					weekStartDate: monday,
-					dailyBatches,
-					leaderboard: {},
-					dailyLeaderboard: {}
-				})
+					await Quiz.create({
+						cmmId,
+						topicId,
+						weekStartDate: monday,
+						dailyBatches,
+						leaderboard: {},
+						dailyLeaderboard: {}
+					})
 
-				console.info(`Created weekly quiz topic ${topicId} for week starting ${monday.toDateString()} in cmm ${cmmId}`)
+					console.info(`Created weekly quiz topic ${topicId} for week starting ${monday.toDateString()} in cmm ${cmmId}`)
+				} catch (innerError) {
+					console.error(`Erro ao gerar quiz semanal para cmm ${cmmId}:`, innerError)
+				}
 			}
 		} catch (error) {
 			console.error('Erro ao gerar quiz semanal:', error)
@@ -156,10 +196,11 @@ export default {
 		try {
 			const monday = getMondayOfCurrentWeek()
 			const quizzes = await Quiz.find({ weekStartDate: monday })
-			let dayIndex = new Date().getDay() - 1
+			let dayIndex = getSaoPauloDate().getDay() - 1
 			if (dayIndex < 0) dayIndex = 6 // Sunday
 
 			for (const quiz of quizzes) {
+				if (quiz.topicId === -1) continue
 				const batch = quiz.dailyBatches.find(b => b.dayIndex === dayIndex)
 				if (!batch || batch.questions.length === 0) continue
 
@@ -200,7 +241,7 @@ export default {
 		try {
 			const monday = getMondayOfCurrentWeek()
 			const quizzes = await Quiz.find({ weekStartDate: monday })
-			let dayIndex = new Date().getDay() - 1
+			let dayIndex = getSaoPauloDate().getDay() - 1
 			if (dayIndex < 0) dayIndex = 6
 
 			for (const quiz of quizzes) {
@@ -256,7 +297,7 @@ export default {
 	},
 
 	async endQuizWeekIfNeeded(quiz: IQuiz): Promise<void> {
-		let dayIndex = new Date().getDay() - 1
+		let dayIndex = getSaoPauloDate().getDay() - 1
 		if (dayIndex < 0) dayIndex = 6
 
 		// If it is Sunday (dayIndex = 6), resolve weekly winner and give them the badge
@@ -298,44 +339,76 @@ export default {
 		try {
 			const cmms = await Member.distinct('cmmId')
 			const monday = getMondayOfCurrentWeek()
+			let cachedQuestions: any[] | null = null
 
 			for (const cmmId of cmms) {
-				const exists = await Quiz.findOne({ cmmId, weekStartDate: monday })
-				if (!exists) {
-					console.info(`No active quiz found for week starting ${monday.toDateString()} in cmm ${cmmId}. Bootstrapping now.`)
-					
-					const parsed = await generateWeeklyQuestions()
-					const todayStr = monday.toLocaleDateString('pt-BR')
-					
-					const topic = await vkApi.board.addTopic({
-						cmmId,
-						title: `QUIZ - Semana de ${todayStr}`,
-						text: `⚽ *BEM-VINDO AO SUPER QUIZ VKBOT!* ⚽\n\nToda noite às 18:00 BRT, teremos uma rodada de 10 perguntas diárias sobre futebol.\nO primeiro membro que acertar cada pergunta acumula pontos para a rodada e para o ranking da semana!\n\nParticipe comentando o palpite exato da pergunta ativa. Boa sorte!`
-					})
+				try {
+					const exists = await Quiz.findOne({ cmmId, weekStartDate: monday })
+					if (!exists) {
+						// Pre-verify board access before calling Gemini to prevent quota drain
+						try {
+							await vkApi.board.getTopics({ groupId: cmmId, count: 1 })
+						} catch (apiError: any) {
+							console.warn(`Skipping quiz bootstrap for cmm ${cmmId} due to board access issues:`, apiError.message || apiError)
+							continue
+						}
 
-					const topicId = topic
+						console.info(`No active quiz found for week starting ${monday.toDateString()} in cmm ${cmmId}. Bootstrapping now.`)
+						
+						if (!cachedQuestions) {
+							cachedQuestions = await generateWeeklyQuestions()
+						}
+						const parsed = cachedQuestions
+						const todayStr = monday.toLocaleDateString('pt-BR')
+						
+						let topicId: number
+						try {
+							const topic = await vkApi.board.addTopic({
+								cmmId,
+								title: `QUIZ - Semana de ${todayStr}`,
+								text: `⚽ *BEM-VINDO AO SUPER QUIZ VKBOT!* ⚽\n\nToda noite às 18:00 BRT, teremos uma rodada de 10 perguntas diárias sobre futebol.\nO primeiro membro que acertar cada pergunta acumula pontos para a rodada e para o ranking da semana!\n\nParticipe comentando o palpite exato da pergunta ativa. Boa sorte!`
+							})
+							topicId = topic
+						} catch (addError: any) {
+							if (addError.message?.includes('Access denied') || addError.error_code === 15) {
+								console.warn(`Access denied when bootstrapping quiz topic for cmm ${cmmId}. Marking as disabled.`)
+								topicId = -1
+							} else {
+								throw addError
+							}
+						}
 
-					const dailyBatches = parsed.map((d: any) => ({
-						dayIndex: d.dayIndex,
-						questions: d.questions.map((q: any) => ({
-							index: q.index,
-							question: q.question,
-							answer: q.answer,
-							status: 'pending'
+						const dailyBatches = parsed.map((d: any) => ({
+							dayIndex: d.dayIndex,
+							questions: d.questions.map((q: any) => ({
+								index: q.index,
+								question: q.question,
+								answer: q.answer,
+								status: 'pending'
+							}))
 						}))
-					}))
 
-					await Quiz.create({
-						cmmId,
-						topicId,
-						weekStartDate: monday,
-						dailyBatches,
-						leaderboard: {},
-						dailyLeaderboard: {}
-					})
+						await Quiz.create({
+							cmmId,
+							topicId,
+							weekStartDate: monday,
+							dailyBatches,
+							leaderboard: {},
+							dailyLeaderboard: {}
+						})
 
-					console.info(`Bootstrapped weekly quiz topic ${topicId} for week starting ${monday.toDateString()} in cmm ${cmmId}`)
+						console.info(`Bootstrapped weekly quiz topic ${topicId} for week starting ${monday.toDateString()} in cmm ${cmmId}`)
+					}
+				} catch (innerError) {
+					console.error(`Erro no bootstrap do quiz semanal para cmm ${cmmId}:`, innerError)
 				}
+			}
+			
+			// Se já passou das 18h no horário de Brasília, rodar verificação para postar o quiz diário
+			const nowSP = getSaoPauloDate()
+			if (nowSP.getHours() >= 18) {
+				console.info('It is past 18:00 BRT on startup, triggering postDailyQuiz check')
+				await this.postDailyQuiz()
 			}
 		} catch (error) {
 			console.error('Erro no bootstrap do quiz semanal:', error)

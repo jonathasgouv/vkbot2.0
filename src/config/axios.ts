@@ -1,9 +1,18 @@
 import axios from 'axios'
+import http from 'http'
+import https from 'https'
+
+// Agents com keepAlive desabilitado para liberar sockets após cada resposta
+// e evitar acúmulo de conexões que satura o limite do Fly.io (25 conexões)
+export const httpAgent = new http.Agent({ keepAlive: false })
+export const httpsAgent = new https.Agent({ keepAlive: false })
 
 // VK API axios instance with credentials
 const vkInstance = axios.create({
 	baseURL: 'https://api.vk.com/method',
-	timeout: 54000,
+	timeout: 10000,
+	httpAgent,
+	httpsAgent,
 })
 
 vkInstance.interceptors.request.use(

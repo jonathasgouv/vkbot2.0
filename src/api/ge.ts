@@ -1,9 +1,12 @@
 import axios from 'axios'
 import { IGeGame } from '@appTypes/copa'
+import { httpAgent, httpsAgent } from '@config/axios'
 
 const geInstance = axios.create({
 	baseURL: 'https://api.globoesporte.globo.com/tabela/b5ff9c28-476e-4816-a699-7645acc94cd0',
-	timeout: 30000,
+	timeout: 10000,
+	httpAgent,
+	httpsAgent,
 	headers: {
 		'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 	}

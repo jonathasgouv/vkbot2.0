@@ -34,6 +34,12 @@ export default {
 				params: queryParams,
 			})
 
+			if (response.data?.error) {
+				const err: any = new Error(response.data.error.error_msg || 'VK API error')
+				err.error_code = response.data.error.error_code
+				throw err
+			}
+
 			return response.data.response
 		},
 

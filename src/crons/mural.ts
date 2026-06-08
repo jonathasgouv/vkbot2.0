@@ -5,6 +5,7 @@ import vkApi from '@api/vk'
 import bot from '@utils/bot'
 import generalFncs from '@utils/general'
 import axios from 'axios'
+import { httpAgent, httpsAgent } from '@config/axios'
 
 const getWeeklyMuralText = async (
 	cmmId: number,
@@ -45,7 +46,8 @@ Escreva o Mural de Destaques Semanal:`
 			{
 				contents: [{ parts: [{ text: prompt }] }],
 				systemInstruction: { parts: [{ text: systemInstruction }] }
-			}
+			},
+			{ timeout: 15000, httpAgent, httpsAgent }
 		)
 
 		const generatedText = geminiResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text
